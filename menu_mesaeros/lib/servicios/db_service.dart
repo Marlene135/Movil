@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class DbService {
-  static const String _baseUrl = 'http://192.168.1.34:8081/KDS';
+  /// Obtiene automáticamente el host actual (localhost o la IP del dispositivo)
+  static String get _baseUrl {
+    final host = Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost';
+    return 'http://$host:8081/KDS';
+  }
 
   /// Valida el PIN contra el endpoint PHP
   static Future<Map<String, dynamic>?> validarPin(String pin) async {
@@ -12,7 +16,6 @@ class DbService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'pin': pin}),
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'ok') {
@@ -21,20 +24,18 @@ class DbService {
       }
       return null;
     } catch (e) {
-      // ignore: avoid_print
       print('Error al conectar con login.php: $e');
       rethrow;
     }
   }
 
-  /// Obtiene la lista de mesas (puedes conectar un endpoint mesas.php más adelante)
+  /// Obtiene la lista de mesas
   static Future<List<Map<String, dynamic>>> obtenerMesas() async {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/mesas.php'),
         headers: {'Content-Type': 'application/json'},
       );
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List) {
@@ -43,7 +44,6 @@ class DbService {
       }
       throw Exception('No se pudieron obtener las mesas');
     } catch (e) {
-      // ignore: avoid_print
       print('Error o fallback en mesas: $e');
       rethrow;
     }

@@ -1,35 +1,28 @@
 <?php
-// Permitir cualquier origen
-if (isset($_SERVER['HTTP_ORIGIN'])) {
-    header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Max-Age: 86400');
-}
+// Mostrar todos los errores de PHP en pantalla
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-// Atender peticiones preflight de CORS (OPTIONS)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'])) {
-        header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-    }
-    if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
-        header("Access-Control-Allow-Headers: {$_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS']}");
-    }
-    http_response_code(200);
-    exit(0);
-}
-
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Content-Type: application/json; charset=UTF-8");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 $input = file_get_contents("php://input");
 $data = json_decode($input, true);
-$pin = $data['pin'] ?? '';
+$pin = trim((string)($data['pin'] ?? ''));
 
-// Conexión PostgreSQL
 $host = "127.0.0.1";
 $port = "5432";
 $dbname = "sazontrack_db";
 $user = "postgres";
-$password = "tu_contraseña_aqui"; // Tu contraseña de postgres
+$password = "123456789"; // <-- VERIFICA TU CONTRASEÑA REAL AQUÍ
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;";
@@ -38,7 +31,15 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
 
-    $stmt = $pdo->prepare("SELECT id, nombre, rol, activo FROM usuarios WHERE pin = :pin AND activo = true LIMIT 1");
+    if (empty($pin)) {
+        echo json_encode([
+            "status" => "ok_conexion",
+            "message" => "Conexión a PostgreSQL exitosa, pero no se envió PIN por POST."
+        ]);
+        exit();
+    }
+
+    $stmt = $pdo->prepare("SELECT id, nombre, rol, activo FROM public.usuarios WHERE (TRIM(pin) = :pin OR TRIM(pin_acceso) = :pin) AND activo = true LIMIT 1");
     $stmt->execute(['pin' => $pin]);
     $usuario = $stmt->fetch();
 
@@ -47,7 +48,12 @@ try {
     } else {
         echo json_encode(["status" => "error", "message" => "PIN incorrecto"]);
     }
-} catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+} catch (Exception $e) {
+    http_response_code(200); // Forzar 200 para ver el texto en el navegador
+    echo json_encode([
+        "status" => "error_bd",
+        "error_tipo" => get_class($e),
+        "mensaje" => $e->getMessage()
+    ]);
 }
+?>
