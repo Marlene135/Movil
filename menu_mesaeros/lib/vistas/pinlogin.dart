@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/keypadbutton.dart';
 import '../servicios/db_service.dart';
 import 'mesas.dart';
+import 'dashboard.dart';
 
 class PinLoginScreen extends StatefulWidget {
   const PinLoginScreen({super.key});
@@ -75,12 +76,12 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
         if (!mounted) return;
 
         // Redirección a la vista de mesas
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MesasScreen(usuario: usuario),
-          ),
-        );
+       Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (_) => DashboardVista(usuario: usuario),
+  ),
+);
    
 
         // Aquí navegas a la siguiente pantalla (mesas o menú):
