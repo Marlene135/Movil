@@ -3,3 +3,10 @@
     Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
     Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
 </IfModule>
+
+# Apache a veces no entrega la cabecera Authorization a PHP; esto la pasa tal cual.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+</IfModule>

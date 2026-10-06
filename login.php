@@ -1,59 +1,46 @@
 <?php
-// Mostrar todos los errores de PHP en pantalla
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-header("Content-Type: application/json; charset=UTF-8");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
-
-$input = file_get_contents("php://input");
-$data = json_decode($input, true);
-$pin = trim((string)($data['pin'] ?? ''));
-
-$host = "127.0.0.1";
-$port = "5432";
-$dbname = "sazontrack_db";
-$user = "postgres";
-$password = "123456789"; // <-- VERIFICA TU CONTRASEÑA REAL AQUÍ
+/**
+ * login.php - Valida el PIN y entrega un token de sesión.
+ * Respuesta correcta: {"status":"ok","usuario":{id,nombre,rol,activo},"token":"..."}
+ * Se mantiene en la raíz (/KDS/login.php) para no romper la URL que ya usaba la app.
+ */
+require __DIR__ . '/api/config.php';
 
 try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;";
-    $pdo = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
+    $data = cuerpo();
+    $pin = trim((string)(isset($data['pin']) ? $data['pin'] : ''));
+    $pdo = db();
 
-    if (empty($pin)) {
-        echo json_encode([
-            "status" => "ok_conexion",
-            "message" => "Conexión a PostgreSQL exitosa, pero no se envió PIN por POST."
-        ]);
-        exit();
+    if ($pin === '') {
+        // Sin PIN: solo comprueba que la conexión a PostgreSQL funciona (útil para diagnóstico)
+        responder(array('mensaje' => 'Conexión a PostgreSQL exitosa, pero no se envió PIN por POST.'));
     }
 
-    $stmt = $pdo->prepare("SELECT id, nombre, rol, activo FROM public.usuarios WHERE (TRIM(pin) = :pin OR TRIM(pin_acceso) = :pin) AND activo = true LIMIT 1");
-    $stmt->execute(['pin' => $pin]);
-    $usuario = $stmt->fetch();
+    $st = $pdo->prepare("SELECT id, nombre, rol, activo
+                           FROM public.usuarios
+                          WHERE (TRIM(pin) = :pin OR TRIM(pin_acceso) = :pin) AND activo = true
+                          ORDER BY id
+                          LIMIT 1");
+    $st->execute(array(':pin' => $pin));
+    $usuario = $st->fetch();
 
-    if ($usuario) {
-        echo json_encode(["status" => "ok", "usuario" => $usuario]);
-    } else {
-        echo json_encode(["status" => "error", "message" => "PIN incorrecto"]);
+    if (!$usuario) {
+        fallar('PIN incorrecto o usuario inactivo.', 401);
     }
-} catch (Exception $e) {
-    http_response_code(200); // Forzar 200 para ver el texto en el navegador
-    echo json_encode([
-        "status" => "error_bd",
-        "error_tipo" => get_class($e),
-        "mensaje" => $e->getMessage()
-    ]);
+
+    // Limpia sesiones vencidas y crea una nueva
+    $pdo->exec("DELETE FROM public.api_tokens WHERE expira_en < CURRENT_TIMESTAMP");
+    $token = bin2hex(random_bytes(32));
+    $horas = (int)kds_config('token_horas');
+    $pdo->prepare("INSERT INTO public.api_tokens (token_hash, id_usuario, expira_en)
+                   VALUES (:h, :u, CURRENT_TIMESTAMP + (CAST(:hrs AS integer) * INTERVAL '1 hour'))")
+        ->execute(array(':h' => hash('sha256', $token), ':u' => $usuario['id'], ':hrs' => $horas));
+
+    // Respuesta compatible con la versión anterior (status + usuario) más el token
+    http_response_code(200);
+    echo json_encode(array('status' => 'ok', 'usuario' => $usuario, 'token' => $token),
+                     JSON_UNESCAPED_UNICODE);
+} catch (ApiError $e) {
+    http_response_code($e->http);
+    echo json_encode(array('status' => 'error', 'message' => $e->getMessage()), JSON_UNESCAPED_UNICODE);
 }
-?>

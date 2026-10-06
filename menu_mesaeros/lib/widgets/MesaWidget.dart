@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 class MesaWidget extends StatefulWidget {
   final String numero;
   final bool isSelected;
+  // Estado en la base de datos: disponible | ocupada | por_limpiar | reservada
+  final String estado;
 
   const MesaWidget({
     Key? key,
     required this.numero,
     required this.isSelected,
+    this.estado = 'disponible',
   }) : super(key: key);
 
   @override
@@ -21,9 +24,33 @@ class _MesaWidgetState extends State<MesaWidget> {
   @override
   Widget build(BuildContext context) {
     final bool isSelected = widget.isSelected;
-    final Color mainColor = isSelected ? const Color(0xFFCBEAD7) : Colors.white;
-    final Color borderColor = isSelected ? const Color(0xFF0F8A50) : Colors.grey.shade300;
-    final Color sillaColor = isSelected ? const Color(0xFFAFDBC0) : Colors.grey.shade300;
+
+    // Color de acento según el estado de la mesa
+    Color acento;
+    switch (widget.estado) {
+      case 'ocupada':
+        acento = const Color(0xFFE65100);
+        break;
+      case 'por_limpiar':
+        acento = const Color(0xFF6B645C);
+        break;
+      case 'reservada':
+        acento = const Color(0xFF3F6FD8);
+        break;
+      default:
+        acento = const Color(0xFF0F8A50);
+    }
+    final bool conEstado = widget.estado != 'disponible';
+
+    final Color mainColor = isSelected
+        ? const Color(0xFFCBEAD7)
+        : (conEstado ? acento.withOpacity(0.12) : Colors.white);
+    final Color borderColor = isSelected
+        ? const Color(0xFF0F8A50)
+        : (conEstado ? acento : Colors.grey.shade300);
+    final Color sillaColor = isSelected
+        ? const Color(0xFFAFDBC0)
+        : (conEstado ? acento.withOpacity(0.35) : Colors.grey.shade300);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -90,6 +117,8 @@ class _MesaWidgetState extends State<MesaWidget> {
             child: Center(
               child: Text(
                 widget.numero,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,

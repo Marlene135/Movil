@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/keypadbutton.dart';
 import '../servicios/db_service.dart';
-import 'mesas.dart';
 import 'dashboard.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+
 
 class PinLoginScreen extends StatefulWidget {
   const PinLoginScreen({super.key});
@@ -149,14 +151,12 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
+                  Text(
                     'SazónTrack',
-                    style: TextStyle(
-                      fontFamily: 'serif',
-                      fontSize: 32,
-                      fontStyle: FontStyle.italic,
+                    style: GoogleFonts.greatVibes(
+                      fontSize: 38,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF26201B),
+                      color: const Color(0xFF26201B),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -276,7 +276,7 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFFECE7DF),
+        color: const Color(0xFFFDFCF8),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
