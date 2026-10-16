@@ -9,7 +9,7 @@ import '../widgets/ui.dart';
 class CocinaVista extends StatefulWidget {
   final Map<String, dynamic>? usuario;
 
-  const CocinaVista({Key? key, this.usuario}) : super(key: key);
+  const CocinaVista({super.key, this.usuario});
 
   @override
   State<CocinaVista> createState() => _CocinaVistaState();

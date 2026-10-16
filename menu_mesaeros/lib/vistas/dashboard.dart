@@ -13,7 +13,7 @@ import 'reservaciones.dart';
 class DashboardVista extends StatefulWidget {
   final Map<String, dynamic>? usuario;
 
-  const DashboardVista({Key? key, this.usuario}) : super(key: key);
+  const DashboardVista({super.key, this.usuario});
 
   @override
   State<DashboardVista> createState() => _DashboardVistaState();

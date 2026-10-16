@@ -13,14 +13,14 @@ class _Borrador {
   final Producto producto;
   int cantidad;
   String notas;
-  _Borrador(this.producto, {this.cantidad = 1, this.notas = ''});
+  _Borrador(this.producto) : notas = '', cantidad = 1;
 }
 
 class MenuVista extends StatefulWidget {
   final Map<String, dynamic>? usuario;
   final int? idMesaInicial;
 
-  const MenuVista({Key? key, this.usuario, this.idMesaInicial}) : super(key: key);
+  const MenuVista({super.key, this.usuario, this.idMesaInicial});
 
   @override
   State<MenuVista> createState() => _MenuVistaState();
@@ -240,7 +240,7 @@ class _MenuVistaState extends State<MenuVista> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         elevation: 0.5,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 162, 139, 246),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),

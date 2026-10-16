@@ -14,7 +14,7 @@ import 'menu.dart';
 class MesasScreen extends StatefulWidget {
   final Map<String, dynamic>? usuario;
 
-  const MesasScreen({Key? key, this.usuario}) : super(key: key);
+  const MesasScreen({super.key, this.usuario});
 
   @override
   State<MesasScreen> createState() => _MesasScreenState();
@@ -508,7 +508,7 @@ class _MesasScreenState extends State<MesasScreen> {
                               width: double.infinity,
                               height: 44,
                               child: OutlinedButton.icon(
-                                onPressed: _ocupado ? null : () => _separarGrupo(mesa!),
+                                onPressed: _ocupado ? null : () => _separarGrupo(mesa),
                                 icon: const Icon(Icons.call_split_rounded, size: 18),
                                 label: const Text('Separar mesas'),
                               ),

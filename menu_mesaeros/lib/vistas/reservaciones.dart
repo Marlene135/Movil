@@ -35,7 +35,7 @@ Color _colorEstado(String e) {
 class ReservacionesVista extends StatefulWidget {
   final Map<String, dynamic>? usuario;
 
-  const ReservacionesVista({Key? key, this.usuario}) : super(key: key);
+  const ReservacionesVista({super.key, this.usuario});
 
   @override
   State<ReservacionesVista> createState() => _ReservacionesVistaState();

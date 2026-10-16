@@ -8,11 +8,11 @@ class MesaWidget extends StatefulWidget {
   final String estado;
 
   const MesaWidget({
-    Key? key,
+    super.key,
     required this.numero,
     required this.isSelected,
     this.estado = 'disponible',
-  }) : super(key: key);
+  });
 
   @override
   State<MesaWidget> createState() => _MesaWidgetState();
@@ -44,13 +44,13 @@ class _MesaWidgetState extends State<MesaWidget> {
 
     final Color mainColor = isSelected
         ? const Color(0xFFCBEAD7)
-        : (conEstado ? acento.withOpacity(0.12) : Colors.white);
+        : (conEstado ? acento.withValues(alpha: 0.12) : Colors.white);
     final Color borderColor = isSelected
         ? const Color(0xFF0F8A50)
         : (conEstado ? acento : Colors.grey.shade300);
     final Color sillaColor = isSelected
         ? const Color(0xFFAFDBC0)
-        : (conEstado ? acento.withOpacity(0.35) : Colors.grey.shade300);
+        : (conEstado ? acento.withValues(alpha: 0.35) : Colors.grey.shade300);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -95,20 +95,20 @@ class _MesaWidgetState extends State<MesaWidget> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _isHovered && !isSelected
-                    ? const Color(0xFF0F8A50).withOpacity(0.5)
+                    ? const Color(0xFF0F8A50).withValues(alpha: 0.5)
                     : borderColor,
                 width: 2,
               ),
               boxShadow: [
                 if (isSelected)
                   BoxShadow(
-                    color: const Color(0xFF0F8A50).withOpacity(0.2),
+                    color: const Color(0xFF0F8A50).withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 if (_isHovered)
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),
@@ -139,10 +139,10 @@ class SillaWidget extends StatelessWidget {
   final Color color;
 
   const SillaWidget({
-    Key? key,
+    super.key,
     this.vertical = false,
     required this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
