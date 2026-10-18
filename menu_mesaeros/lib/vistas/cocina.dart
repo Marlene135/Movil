@@ -94,11 +94,11 @@ class _CocinaVistaState extends State<CocinaVista> {
   Color _color(String e) {
     switch (e) {
       case 'EN_PREPARACION':
-        return const Color(0xFFE6A800);
+        return const Color(0xFFD99A00);
       case 'LISTO':
-        return kVerde;
+        return kEstadoLibre;
       default:
-        return const Color(0xFF6488E4);
+        return kEstadoLimpiar;
     }
   }
 
@@ -110,123 +110,185 @@ class _CocinaVistaState extends State<CocinaVista> {
       tickets.putIfAbsent(it.idOrden, () => []).add(it);
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF1B1612),
-      appBar: AppBar(
-        backgroundColor: kCafe,
-        foregroundColor: Colors.white,
-        title: const Text('Cocina / Barra (KDS)', style: TextStyle(fontSize: 16)),
-        centerTitle: true,
-        actions: [
-          IconButton(tooltip: 'Actualizar', icon: const Icon(Icons.refresh_rounded), onPressed: () => _cargar()),
-        ],
-        bottom: _ocupado
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(3), child: LinearProgressIndicator(minHeight: 3, color: kVerde))
-            : null,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                _filtro('Todas', null),
-                _filtro('Cocina', 'cocina'),
-                _filtro('Barra', 'barra'),
-                const Spacer(),
-                Text('${tickets.length} comandas · ${_items.length} platillos',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
+    return TemaSazon(
+      child: Scaffold(
+        backgroundColor: kFondo,
+        appBar: AppBar(
+          backgroundColor: kFondo,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          toolbarHeight: 72,
+          leadingWidth: 56,
+          leading: BotonRedondo(
+            icono: Icons.arrow_back_rounded,
+            tooltip: 'Volver',
+            onPressed: () => Navigator.maybePop(context),
+          ),
+          titleSpacing: 4,
+          title: const TituloPagina(
+            'KDS - Cocina / Barra',
+            subtitulo: 'Control de comandas en cocina',
+            icono: Icons.soup_kitchen_rounded,
+            colorIcono: kAmbar,
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () => _cargar(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(color: kAmbar, borderRadius: BorderRadius.circular(30)),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.sync_rounded, size: 16, color: kTexto),
+                        SizedBox(width: 6),
+                        Text('Live 8s', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTexto)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-          Expanded(
-            child: _cargando
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                : _error != null
-                    ? Center(
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.white54),
-                          const SizedBox(height: 12),
-                          Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 32),
-                              child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70))),
-                          const SizedBox(height: 12),
-                          ElevatedButton(onPressed: () => _cargar(), child: const Text('Reintentar')),
-                        ]),
-                      )
-                    : tickets.isEmpty
-                        ? const Center(
-                            child: Text('No hay comandas pendientes 🎉',
-                                style: TextStyle(color: Colors.white54, fontSize: 16)))
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.all(12),
-                            child: Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              crossAxisAlignment: WrapCrossAlignment.start,
-                              children: tickets.values.map(_buildTicket).toList(),
+          ],
+          bottom: _ocupado
+              ? const PreferredSize(
+                  preferredSize: Size.fromHeight(3),
+                  child: LinearProgressIndicator(minHeight: 3, color: kAmbar),
+                )
+              : null,
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Wrap(
+                spacing: 0,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _filtro('Todas', null),
+                  _filtro('Cocina', 'cocina'),
+                  _filtro('Barra', 'barra'),
+                  const SizedBox(width: 6),
+                  Text('${tickets.length} comandas · ${_items.length} platillos',
+                      style: const TextStyle(color: kTextoSuave, fontSize: 12)),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: const [
+                    _Leyenda('< 10 min (Normal)', kCian, kTexto),
+                    _Leyenda('10 – 20 min (Alerta)', kAmbar, kTexto),
+                    _Leyenda('> 20 min (Urgente)', kEstadoOcupada, Colors.white),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: _cargando
+                  ? const Center(child: CircularProgressIndicator(color: kCafe))
+                  : _error != null
+                      ? ErrorConexion(mensajeError: _error!, onReintentar: () => _cargar())
+                      : tickets.isEmpty
+                          ? _buildVacio()
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: Wrap(
+                                spacing: 14,
+                                runSpacing: 14,
+                                crossAxisAlignment: WrapCrossAlignment.start,
+                                children: tickets.values.map(_buildTicket).toList(),
+                              ),
                             ),
-                          ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVacio() {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: kEstadoLibre,
+            child: Icon(Icons.check_rounded, color: Colors.white, size: 36),
           ),
+          SizedBox(height: 14),
+          Text('¡Cocina al día!',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF5E5850))),
+          SizedBox(height: 6),
+          Text('No hay órdenes pendientes.', style: TextStyle(fontSize: 14, color: kTextoSuave)),
         ],
       ),
     );
   }
 
   Widget _filtro(String texto, String? valor) {
-    final sel = _estacion == valor;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(texto),
-        selected: sel,
-        selectedColor: kVerde,
-        backgroundColor: Colors.white,
-        labelStyle: TextStyle(color: sel ? Colors.white : Colors.black87, fontWeight: FontWeight.w600),
-        onSelected: (_) {
-          setState(() => _estacion = valor);
-          _cargar();
-        },
-      ),
+    return PillChip(
+      texto: texto,
+      seleccionado: _estacion == valor,
+      onTap: () {
+        setState(() => _estacion = valor);
+        _cargar();
+      },
     );
   }
 
   Widget _buildTicket(List<KdsItem> items) {
     final primero = items.first;
     final espera = items.map((i) => i.minutos).reduce((a, b) => a > b ? a : b);
-    final Color encabezado = espera >= 20
-        ? const Color(0xFFC62828)
-        : (espera >= 10 ? const Color(0xFFE6A800) : const Color(0xFF3A7D44));
+    final Color encabezado = espera >= 20 ? kEstadoOcupada : (espera >= 10 ? kAmbar : kCian);
+    final Color textoEncabezado = espera >= 20 ? Colors.white : kTexto;
     final pendientes = items.where((i) => i.estado != 'LISTO').map((i) => i.idDetalle).toList();
     final listos = items.where((i) => i.estado == 'LISTO').map((i) => i.idDetalle).toList();
 
     return Container(
       width: 290,
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: kBorde),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4)),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             color: encabezado,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Mesa ${primero.mesa}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                Text('hace $espera min', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    style: TextStyle(color: textoEncabezado, fontWeight: FontWeight.w800, fontSize: 17)),
+                Text('hace $espera min',
+                    style: TextStyle(color: textoEncabezado, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-            child: Text(primero.folio, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+            child: Text(primero.folio, style: const TextStyle(fontSize: 11, color: kTextoSuave)),
           ),
           ...items.map(_buildItem),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 if (pendientes.isNotEmpty)
@@ -241,7 +303,7 @@ class _CocinaVistaState extends State<CocinaVista> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: _ocupado ? null : () => _cambiar(listos, 'ENTREGADO'),
-                      style: ElevatedButton.styleFrom(backgroundColor: kVerde, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(backgroundColor: kEstadoLibre, foregroundColor: Colors.white),
                       child: const Text('Entregar listos', style: TextStyle(fontSize: 12)),
                     ),
                   ),
@@ -257,8 +319,8 @@ class _CocinaVistaState extends State<CocinaVista> {
     final color = _color(it.estado);
     final sig = _siguiente(it.estado);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade200))),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: kBorde))),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -266,16 +328,13 @@ class _CocinaVistaState extends State<CocinaVista> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${it.cantidad} × ${it.nombre}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('${it.cantidad} × ${it.nombre}',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: kTexto)),
                 if (it.notas.isNotEmpty)
-                  Text('» ${it.notas}', style: const TextStyle(fontSize: 12, color: Color(0xFFC62828), fontStyle: FontStyle.italic)),
-                Container(
-                  margin: const EdgeInsets.only(top: 3),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                  child: Text('${etiquetaEstadoItem(it.estado)} · ${it.estacion}',
-                      style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
-                ),
+                  Text('» ${it.notas}',
+                      style: const TextStyle(fontSize: 12, color: kRojo, fontStyle: FontStyle.italic)),
+                const SizedBox(height: 4),
+                EtiquetaEstado('${etiquetaEstadoItem(it.estado)} · ${it.estacion}', color, suave: true),
               ],
             ),
           ),
@@ -286,6 +345,23 @@ class _CocinaVistaState extends State<CocinaVista> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Etiqueta de la leyenda de tiempos de espera.
+class _Leyenda extends StatelessWidget {
+  final String texto;
+  final Color fondo;
+  final Color colorTexto;
+  const _Leyenda(this.texto, this.fondo, this.colorTexto);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: fondo, borderRadius: BorderRadius.circular(8)),
+      child: Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorTexto)),
     );
   }
 }

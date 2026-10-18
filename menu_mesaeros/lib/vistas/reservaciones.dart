@@ -1,4 +1,4 @@
-// vistas/reservaciones.dart - Calendario y detalle de reservas (datos reales)
+/// vistas/reservaciones.dart - Calendario y detalle de reservas (datos reales)
 import 'package:flutter/material.dart';
 import '../modulos/orden.dart';
 import '../modulos/reserva.dart';
@@ -6,7 +6,7 @@ import '../servicios/api_service.dart';
 import '../servicios/db_service.dart';
 import '../widgets/ui.dart';
 
-const Color _kGranate = Color(0xFF8B0000);
+const Color _kGranate = kCafe; // color de acento (antes granate, ahora café oscuro del estilo SazónTrack)
 const List<String> _meses = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
@@ -20,15 +20,15 @@ String _cap(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 Color _colorEstado(String e) {
   switch (e) {
     case 'confirmada':
-      return Colors.green;
+      return kEstadoLibre;
     case 'pendiente':
-      return Colors.amber.shade700;
+      return const Color(0xFFD99A00);
     case 'cancelada':
       return Colors.grey;
     case 'completada':
-      return Colors.teal;
+      return const Color(0xFF0E8F9E);
     default:
-      return Colors.blue;
+      return kEstadoLimpiar;
   }
 }
 
@@ -149,64 +149,57 @@ class _ReservacionesVistaState extends State<ReservacionesVista> {
     final activasDelDia = reservasDelDia.where((r) => r.estado != 'cancelada').toList();
     final hoy = DateTime.now();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      appBar: AppBar(
-        elevation: 0.5,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('Calendario de Reservas',
-            style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: Center(
-              child: Text(_cap(_fechaLarga(hoy)), style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+    return TemaSazon(
+      child: Scaffold(
+        backgroundColor: kFondo,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: kFondo,
+          surfaceTintColor: Colors.transparent,
+          toolbarHeight: 72,
+          leadingWidth: 56,
+          leading: BotonRedondo(
+            icono: Icons.arrow_back_rounded,
+            tooltip: 'Volver',
+            onPressed: () => Navigator.pop(context),
+          ),
+          titleSpacing: 4,
+          title: TituloPagina(
+            'Calendario de Reservas',
+            subtitulo: _cap(_fechaLarga(hoy)),
+            icono: Icons.calendar_month_rounded,
+          ),
+          actions: [
+            BotonRedondo(
+              tooltip: 'Actualizar',
+              icono: Icons.refresh_rounded,
+              onPressed: () => _cargar(),
             ),
-          ),
-          IconButton(
-            tooltip: 'Actualizar',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.black87),
-            onPressed: () => _cargar(),
-          ),
-        ],
-      ),
-      body: _cargando
-          ? const Center(child: CircularProgressIndicator(color: kCafe))
-          : _error != null
-              ? Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
-                    const SizedBox(height: 12),
-                    Padding(padding: const EdgeInsets.symmetric(horizontal: 32), child: Text(_error!, textAlign: TextAlign.center)),
-                    const SizedBox(height: 12),
-                    ElevatedButton(onPressed: () => _cargar(), child: const Text('Reintentar')),
-                  ]),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 6, child: _buildCalendario(hoy)),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 4, child: _buildPanelDia(reservasDelDia, activasDelDia)),
-                    ],
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: _cargando
+            ? const Center(child: CircularProgressIndicator(color: kCafe))
+            : _error != null
+                ? ErrorConexion(mensajeError: _error!, onReintentar: () => _cargar())
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 6, child: _buildCalendario(hoy)),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 4, child: _buildPanelDia(reservasDelDia, activasDelDia)),
+                      ],
+                    ),
                   ),
-                ),
+      ),
     );
   }
 
-  Widget _tarjeta({required Widget child}) => Container(
+  Widget _tarjeta({required Widget child}) => TarjetaSazon(
+        radio: 24,
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))],
-        ),
         child: child,
       );
 
@@ -332,9 +325,9 @@ class _ReservacionesVistaState extends State<ReservacionesVista> {
             ),
           ),
           Row(children: [
-            _LeyendaDot(Colors.green, 'Confirmada'),
-            _LeyendaDot(Colors.amber.shade700, 'Pendiente'),
-            _LeyendaDot(Colors.blue, 'Reservada'),
+            _LeyendaDot(kEstadoLibre, 'Confirmada'),
+            _LeyendaDot(const Color(0xFFD99A00), 'Pendiente'),
+            _LeyendaDot(kEstadoLimpiar, 'Reservada'),
             _LeyendaDot(Colors.grey, 'Cancelada'),
             const Spacer(),
             Text('En el mes: ${_reservas.length}', style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
@@ -406,8 +399,11 @@ class _ReservacionesVistaState extends State<ReservacionesVista> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorde),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,11 +419,7 @@ class _ReservacionesVistaState extends State<ReservacionesVista> {
                         fontSize: 14,
                         decoration: r.estado == 'cancelada' ? TextDecoration.lineThrough : null)),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                child: Text(r.estadoEtiqueta, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
+              EtiquetaEstado(r.estadoEtiqueta, color),
               PopupMenuButton<String>(
                 tooltip: 'Opciones',
                 icon: const Icon(Icons.more_vert, size: 18),
@@ -555,12 +547,17 @@ class _ReservaDialogState extends State<_ReservaDialog> {
       initialDate: _fecha,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
+      builder: (c, child) => TemaSazon(child: child ?? const SizedBox.shrink()),
     );
     if (f != null) setState(() => _fecha = f);
   }
 
   Future<void> _elegirHora() async {
-    final h = await showTimePicker(context: context, initialTime: _hora);
+    final h = await showTimePicker(
+      context: context,
+      initialTime: _hora,
+      builder: (c, child) => TemaSazon(child: child ?? const SizedBox.shrink()),
+    );
     if (h != null) setState(() => _hora = h);
   }
 
@@ -587,8 +584,12 @@ class _ReservaDialogState extends State<_ReservaDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
+
+  Widget _dialogo() {
     return AlertDialog(
+      backgroundColor: kPanel,
+      shape: kFormaDialogo,
       title: Text(widget.reserva == null ? 'Nueva reserva' : 'Editar reserva'),
       content: SizedBox(
         width: 380,
@@ -596,12 +597,12 @@ class _ReservaDialogState extends State<_ReservaDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: _cliente, decoration: const InputDecoration(labelText: 'Cliente', border: OutlineInputBorder())),
+              TextField(controller: _cliente, decoration: campo('Cliente')),
               const SizedBox(height: 12),
               TextField(
                 controller: _telefono,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Teléfono', border: OutlineInputBorder()),
+                decoration: campo('Teléfono'),
               ),
               const SizedBox(height: 12),
               Row(children: [
@@ -625,7 +626,7 @@ class _ReservaDialogState extends State<_ReservaDialog> {
               TextField(
                 controller: _personas,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Personas', border: OutlineInputBorder()),
+                decoration: campo('Personas'),
               ),
               const SizedBox(height: 12),
               Selector<int?>(
@@ -649,7 +650,7 @@ class _ReservaDialogState extends State<_ReservaDialog> {
               TextField(
                 controller: _notas,
                 maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Alergias / notas', border: OutlineInputBorder()),
+                decoration: campo('Alergias / notas'),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),

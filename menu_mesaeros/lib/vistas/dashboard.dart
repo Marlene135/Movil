@@ -5,6 +5,7 @@ import '../modulos/conv.dart';
 import '../modulos/usuario.dart';
 import '../servicios/api_service.dart';
 import '../servicios/db_service.dart';
+import '../widgets/ui.dart';
 import 'cocina.dart';
 import 'menu.dart';
 import 'mesas.dart';
@@ -81,13 +82,6 @@ class _DashboardVistaState extends State<DashboardVista> {
     final String nombreMesero = widget.usuario?['nombre'] ?? 'Usuario';
     final String rol = widget.usuario?['rol'] ?? 'Mesero / Comandero';
 
-    const Color bgOrange = Color(0xFFFAF8F5);
-    const Color bgCardLight = Color(0xFFFFF9EC);
-    const Color tealColor = Color(0xFFD7C9B8);
-    const Color redColor = Color(0xFFD8C8B5);
-    const Color yellowColor = Color(0xFFF1C40F);
-    const Color blueColor = Color(0xFF6488E4);
-
     final int mesasTotal = _n('mesas', 'total');
     final int mesasDisp = _n('mesas', 'disponibles');
     final int mesasOcup = _n('mesas', 'ocupadas');
@@ -95,315 +89,378 @@ class _DashboardVistaState extends State<DashboardVista> {
     final int prodDisp = _n('productos', 'disponibles');
     final int reservasHoy = toInt(_resumen?['reservas_hoy']);
 
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: bgCardLight,
+    return TemaSazon(
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: kFondo,
 
-      // -------------------------------------------------------------
-      // DRAWER: MENÚ LATERAL DESLIZABLE
-      // -------------------------------------------------------------
-      drawer: Drawer(
-        child: Container(
-          color: const Color(0xFF26201B),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              UserAccountsDrawerHeader(
-                decoration: const BoxDecoration(color: Color(0xFF1B1612)),
-                accountName: Text(
-                  nombreMesero,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        // -------------------------------------------------------------
+        // DRAWER: BARRA LATERAL (mismo estilo que la barra de las capturas)
+        // -------------------------------------------------------------
+        drawer: Drawer(
+          backgroundColor: kPanel,
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(color: kCafe, shape: BoxShape.circle),
+                        child: const Icon(Icons.room_service_rounded, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const LogoSazon(tamano: 30),
+                            Text('Panel de Control',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTexto.withValues(alpha: 0.8))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                accountEmail: Text(
-                  rol,
-                  style: const TextStyle(color: Colors.white70),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1)),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    children: [
+                      _itemMenu(Icons.pie_chart_rounded, 'Dashboard', activo: true, onTap: () => Navigator.pop(context)),
+                      _itemMenu(Icons.calendar_month_rounded, 'Reservaciones', onTap: () {
+                        Navigator.pop(context);
+                        _ir(ReservacionesVista(usuario: widget.usuario));
+                      }),
+                      _itemMenu(Icons.restaurant_rounded, 'Mapa Mesas', onTap: () {
+                        Navigator.pop(context);
+                        _ir(MesasScreen(usuario: widget.usuario));
+                      }),
+                      _itemMenu(Icons.point_of_sale_rounded, 'Menú / Caja POS', onTap: () {
+                        Navigator.pop(context);
+                        _ir(MenuVista(usuario: widget.usuario));
+                      }),
+                      _itemMenu(Icons.soup_kitchen_rounded, 'KDS Cocina / Barra', onTap: () {
+                        Navigator.pop(context);
+                        _ir(CocinaVista(usuario: widget.usuario));
+                      }),
+                    ],
+                  ),
                 ),
-                currentAccountPicture: const CircleAvatar(
-                  backgroundColor: bgOrange,
-                  child: Icon(Icons.person, size: 40, color: Colors.white),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(height: 1)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Color(0xFF6B645C),
+                        child: Icon(Icons.person, color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(nombreMesero,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: kTexto)),
+                            Text(rol, style: const TextStyle(fontSize: 12, color: kTextoSuave)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Cerrar sesión',
+                        icon: const Icon(Icons.logout_rounded, color: kEstadoOcupada, size: 20),
+                        onPressed: _cerrarSesion,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // -------------------------------------------------------------
+        // CUERPO DEL DASHBOARD
+        // -------------------------------------------------------------
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: () => _cargar(silencioso: true),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Barra superior: menú, título y actualizar
+                        Row(
+                          children: [
+                            Material(
+                              color: kTexto,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                tooltip: 'Menú',
+                                icon: const Icon(Icons.menu_rounded, size: 22, color: Colors.white),
+                                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: TituloPagina('Dashboard', subtitulo: 'Resumen del restaurante en vivo'),
+                            ),
+                            BotonRedondo(
+                              tooltip: 'Actualizar',
+                              icono: Icons.refresh_rounded,
+                              onPressed: () => _cargar(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+
+                        // Tarjeta del usuario
+                        TarjetaSazon(
+                          radio: 26,
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: kBorde, width: 2),
+                                ),
+                                child: const CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: kCafe,
+                                  child: Icon(Icons.person, size: 34, color: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      nombreMesero,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kTexto),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(rol, style: const TextStyle(fontSize: 13, color: kTextoSuave)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        if (_error != null)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFDECEA),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: kRojo.withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.wifi_off_rounded, color: kRojo),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(_error!, style: const TextStyle(fontSize: 12, color: kRojo)),
+                                ),
+                                TextButton(onPressed: () => _cargar(), child: const Text('Reintentar')),
+                              ],
+                            ),
+                          ),
+
+                        // Sección: Estado de órdenes
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Estado de Órdenes',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kTexto),
+                            ),
+                            GestureDetector(
+                              onTap: () => _ir(ReservacionesVista(usuario: widget.usuario)),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: kBorde),
+                                ),
+                                child: const Icon(Icons.calendar_month_rounded, color: kTexto, size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        if (_cargando && _resumen == null)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(color: kCafe),
+                            ),
+                          )
+                        else ...[
+                          _buildTaskStatusRow(
+                            color: kEstadoOcupada,
+                            icon: Icons.access_time_rounded,
+                            title: 'Pendientes',
+                            subtitle: '${_n('pendientes', 'platillos')} platillos en espera '
+                                '(${_n('pendientes', 'comandas')} comandas)',
+                            onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTaskStatusRow(
+                            color: kAmbar,
+                            icon: Icons.soup_kitchen_rounded,
+                            title: 'En Preparación',
+                            subtitle: '${_n('preparacion', 'platillos')} platillos en '
+                                '${_n('preparacion', 'comandas')} comandas',
+                            onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTaskStatusRow(
+                            color: kEstadoLimpiar,
+                            icon: Icons.check_circle_rounded,
+                            title: 'Listos para Entregar',
+                            subtitle: '${_n('listos', 'platillos')} platillos listos en '
+                                '${_n('listos', 'comandas')} comandas',
+                            onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
+                          ),
+                          if (esCajaOAdmin(widget.usuario)) ...[
+                            const SizedBox(height: 12),
+                            _buildTaskStatusRow(
+                              color: kEstadoLibre,
+                              icon: Icons.payments_rounded,
+                              title: 'Ventas de hoy',
+                              subtitle: '${dinero(toDouble(_resumen?['ventas_hoy']))} · '
+                                  '${toInt(_resumen?['ordenes_abiertas'])} cuentas abiertas',
+                            ),
+                          ],
+                        ],
+
+                        const SizedBox(height: 26),
+
+                        // Accesos rápidos
+                        const Text(
+                          'Acceso Rápido',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: kTexto),
+                        ),
+                        const SizedBox(height: 14),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildProjectCard(
+                                color: kEstadoLibre,
+                                icon: Icons.restaurant_rounded,
+                                title: 'Mapa de Mesas',
+                                progress: '$mesasDisp disponibles · $mesasOcup ocupadas',
+                                value: mesasTotal == 0 ? 0 : mesasOcup / mesasTotal,
+                                centro: '$mesasTotal',
+                                onTap: () => _ir(MesasScreen(usuario: widget.usuario)),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _buildProjectCard(
+                                color: kAmbar,
+                                icon: Icons.point_of_sale_rounded,
+                                title: 'Menú POS',
+                                progress: 'Tomar comanda · $prodDisp de $prodTotal disponibles',
+                                value: prodTotal == 0 ? 0 : prodDisp / prodTotal,
+                                centro: '$prodTotal',
+                                onTap: () => _ir(MenuVista(usuario: widget.usuario)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildProjectCard(
+                                color: kEstadoOcupada,
+                                icon: Icons.soup_kitchen_rounded,
+                                title: 'KDS Cocina / Barra',
+                                progress: 'Pantalla de comandas en vivo',
+                                value: 1,
+                                centro: '${_n('pendientes', 'platillos') + _n('preparacion', 'platillos')}',
+                                onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _buildProjectCard(
+                                color: kEstadoLimpiar,
+                                icon: Icons.calendar_month_rounded,
+                                title: 'Reservaciones',
+                                progress: '$reservasHoy para hoy',
+                                value: reservasHoy == 0 ? 0 : 1,
+                                centro: '$reservasHoy',
+                                onTap: () => _ir(ReservacionesVista(usuario: widget.usuario)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              ListTile(
-                leading: const Icon(Icons.dashboard_rounded, color: bgOrange),
-                title: const Text('Inicio / Dashboard', style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.calendar_month_rounded, color: Colors.white70),
-                title: const Text('Reservaciones / Calendario', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _ir(ReservacionesVista(usuario: widget.usuario));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.table_restaurant_rounded, color: Colors.white70),
-                title: const Text('Mesas Disponibles', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _ir(MesasScreen(usuario: widget.usuario));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.restaurant_menu_rounded, color: Colors.white70),
-                title: const Text('Menú / Catálogo', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _ir(MenuVista(usuario: widget.usuario));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.soup_kitchen_rounded, color: Colors.white70),
-                title: const Text('Cocina / Barra (KDS)', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _ir(CocinaVista(usuario: widget.usuario));
-                },
-              ),
-              const Divider(color: Colors.white24),
-              ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.redAccent)),
-                onTap: _cerrarSesion,
-              ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
 
-      // -------------------------------------------------------------
-      // CUERPO DEL DASHBOARD
-      // -------------------------------------------------------------
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => _cargar(silencioso: true),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
+  /// Opción de la barra lateral: activa = píldora oscura.
+  Widget _itemMenu(IconData icono, String texto, {bool activo = false, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: activo ? kTexto : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
               children: [
-                // Header Curvo con Info del Usuario
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                  decoration: const BoxDecoration(
-                    color: bgOrange,
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(36),
-                      bottomRight: Radius.circular(36),
+                Icon(icono, size: 22, color: activo ? Colors.white : kTexto.withValues(alpha: 0.75)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    texto,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: activo ? FontWeight.w700 : FontWeight.w500,
+                      color: activo ? Colors.white : kTexto,
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.menu_rounded, size: 28, color: Color(0xFF26201B)),
-                            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                          ),
-                          IconButton(
-                            tooltip: 'Actualizar',
-                            icon: const Icon(Icons.refresh_rounded, size: 28, color: Color(0xFF26201B)),
-                            onPressed: () => _cargar(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: redColor, width: 2.5),
-                            ),
-                            child: const CircleAvatar(
-                              radius: 36,
-                              backgroundColor: Color(0xFF6488E4),
-                              child: Icon(Icons.person, size: 42, color: Colors.white),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                nombreMesero,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF26201B),
-                                ),
-                              ),
-                              Text(
-                                rol,
-                                style: const TextStyle(fontSize: 14, color: Color(0xFF6B645C)),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    children: [
-                      if (_error != null)
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFDECEA),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.wifi_off_rounded, color: Color(0xFFC62828)),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(_error!, style: const TextStyle(fontSize: 12, color: Color(0xFFC62828))),
-                              ),
-                              TextButton(onPressed: () => _cargar(), child: const Text('Reintentar')),
-                            ],
-                          ),
-                        ),
-
-                      // Sección: Estado de órdenes
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Estado de Órdenes',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF26201B)),
-                          ),
-                          InkWell(
-                            onTap: () => _ir(ReservacionesVista(usuario: widget.usuario)),
-                            borderRadius: BorderRadius.circular(20),
-                            child: CircleAvatar(
-                              backgroundColor: tealColor,
-                              radius: 20,
-                              child: const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 20),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (_cargando && _resumen == null)
-                        const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: CircularProgressIndicator(color: Color(0xFF26201B)),
-                        )
-                      else ...[
-                        _buildTaskStatusRow(
-                          color: redColor,
-                          icon: Icons.access_time_rounded,
-                          title: 'Pendientes',
-                          subtitle: '${_n('pendientes', 'platillos')} platillos en espera '
-                              '(${_n('pendientes', 'comandas')} comandas)',
-                          onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTaskStatusRow(
-                          color: yellowColor,
-                          icon: Icons.soup_kitchen_rounded,
-                          title: 'En Preparación',
-                          subtitle: '${_n('preparacion', 'platillos')} platillos en '
-                              '${_n('preparacion', 'comandas')} comandas',
-                          onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTaskStatusRow(
-                          color: blueColor,
-                          icon: Icons.check_circle_rounded,
-                          title: 'Listos para Entregar',
-                          subtitle: '${_n('listos', 'platillos')} platillos listos en '
-                              '${_n('listos', 'comandas')} comandas',
-                          onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
-                        ),
-                        if (esCajaOAdmin(widget.usuario)) ...[
-                          const SizedBox(height: 12),
-                          _buildTaskStatusRow(
-                            color: const Color(0xFF2E7D32),
-                            icon: Icons.payments_rounded,
-                            title: 'Ventas de hoy',
-                            subtitle: '${dinero(toDouble(_resumen?['ventas_hoy']))} · '
-                                '${toInt(_resumen?['ordenes_abiertas'])} cuentas abiertas',
-                          ),
-                        ],
-                      ],
-
-                      const SizedBox(height: 24),
-
-                      // Accesos rápidos
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Acceso Rápido',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF26201B)),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildProjectCard(
-                              color: tealColor,
-                              title: 'Mesas',
-                              progress: '$mesasDisp disponibles · $mesasOcup ocupadas',
-                              value: mesasTotal == 0 ? 0 : mesasOcup / mesasTotal,
-                              centro: '$mesasTotal',
-                              onTap: () => _ir(MesasScreen(usuario: widget.usuario)),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildProjectCard(
-                              color: redColor,
-                              title: 'Menú POS',
-                              progress: 'Tomar comanda · $prodDisp de $prodTotal disponibles',
-                              value: prodTotal == 0 ? 0 : prodDisp / prodTotal,
-                              centro: '$prodTotal',
-                              onTap: () => _ir(MenuVista(usuario: widget.usuario)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildProjectCard(
-                              color: const Color(0xFFC9B79E),
-                              title: 'Cocina / Barra',
-                              progress: 'Pantalla KDS en vivo',
-                              value: 1,
-                              centro: '${_n('pendientes', 'platillos') + _n('preparacion', 'platillos')}',
-                              onTap: () => _ir(CocinaVista(usuario: widget.usuario)),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildProjectCard(
-                              color: const Color(0xFFB8A58C),
-                              title: 'Reservaciones',
-                              progress: '$reservasHoy para hoy',
-                              value: reservasHoy == 0 ? 0 : 1,
-                              centro: '$reservasHoy',
-                              onTap: () => _ir(ReservacionesVista(usuario: widget.usuario)),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                    ],
                   ),
                 ),
               ],
@@ -421,36 +478,42 @@ class _DashboardVistaState extends State<DashboardVista> {
     required String subtitle,
     VoidCallback? onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: color,
-            radius: 20,
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF26201B)),
-                ),
-                Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
+      child: TarjetaSazon(
+        radio: 20,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: color,
+              radius: 22,
+              child: Icon(icon, color: Colors.white, size: 22),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kTexto),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: kTextoSuave)),
+                ],
+              ),
+            ),
+            if (onTap != null) const Icon(Icons.chevron_right_rounded, color: kTextoSuave),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProjectCard({
     required Color color,
+    required IconData icon,
     required String title,
     required String progress,
     required double value,
@@ -459,53 +522,59 @@ class _DashboardVistaState extends State<DashboardVista> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 160,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(24)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Stack(
-                alignment: Alignment.center,
+      child: SizedBox(
+        height: 172,
+        child: TarjetaSazon(
+          radio: 24,
+          colorSuperior: color,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SizedBox(
-                    width: 42,
-                    height: 42,
-                    child: CircularProgressIndicator(
-                      value: value.clamp(0.0, 1.0).toDouble(),
-                      color: Colors.white,
-                      backgroundColor: Colors.white24,
-                      strokeWidth: 3,
-                    ),
-                  ),
-                  Text(
-                    centro,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  Icon(icon, color: color, size: 26),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CircularProgressIndicator(
+                          value: value.clamp(0.0, 1.0).toDouble(),
+                          color: color,
+                          backgroundColor: color.withValues(alpha: 0.15),
+                          strokeWidth: 4,
+                        ),
+                      ),
+                      Text(
+                        centro,
+                        style: const TextStyle(color: kTexto, fontWeight: FontWeight.w800, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  progress,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
-                ),
-              ],
-            )
-          ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(color: kTexto, fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    progress,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kTextoSuave, fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

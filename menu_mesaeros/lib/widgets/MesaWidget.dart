@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ui.dart';
 
 // Widget principal que dibuja la mesa cuadrada/redondeada junto con sus sillas
 class MesaWidget extends StatefulWidget {
@@ -25,32 +26,26 @@ class _MesaWidgetState extends State<MesaWidget> {
   Widget build(BuildContext context) {
     final bool isSelected = widget.isSelected;
 
-    // Color de acento según el estado de la mesa
+    // Color de acento según el estado de la mesa (mismos colores que la leyenda)
     Color acento;
     switch (widget.estado) {
       case 'ocupada':
-        acento = const Color(0xFFE65100);
+        acento = kEstadoOcupada;
         break;
       case 'por_limpiar':
-        acento = const Color(0xFF6B645C);
+        acento = kEstadoLimpiar;
         break;
       case 'reservada':
-        acento = const Color(0xFF3F6FD8);
+        acento = kEstadoReservada;
         break;
       default:
-        acento = const Color(0xFF0F8A50);
+        acento = kEstadoLibre;
     }
-    final bool conEstado = widget.estado != 'disponible';
 
-    final Color mainColor = isSelected
-        ? const Color(0xFFCBEAD7)
-        : (conEstado ? acento.withValues(alpha: 0.12) : Colors.white);
     final Color borderColor = isSelected
-        ? const Color(0xFF0F8A50)
-        : (conEstado ? acento : Colors.grey.shade300);
-    final Color sillaColor = isSelected
-        ? const Color(0xFFAFDBC0)
-        : (conEstado ? acento.withValues(alpha: 0.35) : Colors.grey.shade300);
+        ? kTexto
+        : (_isHovered ? acento.withValues(alpha: 0.6) : kBorde);
+    final Color sillaColor = isSelected ? kTexto.withValues(alpha: 0.35) : acento.withValues(alpha: 0.35);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -88,43 +83,40 @@ class _MesaWidgetState extends State<MesaWidget> {
             width: 60,
             height: 60,
             transform: _isHovered
-                ? (Matrix4.identity()..translate(0, -4, 0))
+                ? Matrix4.translationValues(0.0, -4.0, 0.0)
                 : Matrix4.identity(),
             decoration: BoxDecoration(
-              color: mainColor,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _isHovered && !isSelected
-                    ? const Color(0xFF0F8A50).withValues(alpha: 0.5)
-                    : borderColor,
-                width: 2,
-              ),
+              border: Border.all(color: borderColor, width: isSelected ? 2 : 1),
               boxShadow: [
-                if (isSelected)
-                  BoxShadow(
-                    color: const Color(0xFF0F8A50).withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                if (_isHovered)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: _isHovered || isSelected ? 0.12 : 0.05),
+                  blurRadius: _isHovered || isSelected ? 12 : 6,
+                  offset: const Offset(0, 4),
+                ),
               ],
             ),
-            child: Center(
-              child: Text(
-                widget.numero,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: isSelected ? const Color(0xFF0F8A50) : Colors.black87,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                // Franja superior con el color del estado (como en el mapa de mesas)
+                Container(height: 6, color: acento),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      widget.numero,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: kTexto,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],

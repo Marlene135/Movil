@@ -337,21 +337,20 @@ class _MesasScreenState extends State<MesasScreen> {
   Color _colorEstado(String e) {
     switch (e) {
       case 'ocupada':
-        return const Color(0xFFE65100);
+        return kEstadoOcupada;
       case 'por_limpiar':
-        return const Color(0xFF6B645C);
+        return kEstadoLimpiar;
       case 'reservada':
-        return const Color(0xFF3F6FD8);
+        return kEstadoReservada;
       default:
-        return kVerde;
+        return kEstadoLibre;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final String tituloHeader = widget.usuario != null
-        ? 'Mesas - ${widget.usuario!['nombre'] ?? 'Cajero Principal'}'
-        : 'Mesas - Cajero Principal';
+    final String tituloHeader = 'Estado operativo, apertura y asignación · '
+        '${widget.usuario?['nombre'] ?? 'Cajero Principal'}';
 
     final mesa = _mesaSel;
     final bool tieneGrupoUnido = mesa != null && mesa.grupo != null && _grupoDe(mesa).length > 1;
@@ -359,31 +358,34 @@ class _MesasScreenState extends State<MesasScreen> {
     final double totalCuenta = miembros.fold<double>(0, (s, m) => s + m.totalActual);
     final bool hayCuenta = miembros.any((m) => m.idOrden != null);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAF8F5),
+    return TemaSazon(
+      child: Scaffold(
+      backgroundColor: kFondo,
       appBar: AppBar(
-        elevation: 0.5,
-        backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        elevation: 0,
+        backgroundColor: kFondo,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: 72,
+        leadingWidth: 56,
+        leading: BotonRedondo(
+          icono: Icons.arrow_back_rounded,
+          tooltip: 'Volver',
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          tituloHeader,
-          style: const TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.normal),
-        ),
-        centerTitle: true,
+        titleSpacing: 4,
+        title: TituloPagina('Mapa de Mesas', subtitulo: tituloHeader),
         actions: [
-          IconButton(
+          BotonRedondo(
             tooltip: 'Actualizar',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.black87),
+            icono: Icons.refresh_rounded,
             onPressed: () => _cargar(),
           ),
+          const SizedBox(width: 8),
         ],
         bottom: _ocupado
             ? const PreferredSize(
                 preferredSize: Size.fromHeight(3),
-                child: LinearProgressIndicator(minHeight: 3, color: kVerde),
+                child: LinearProgressIndicator(minHeight: 3, color: kEstadoLibre),
               )
             : null,
       ),
@@ -398,9 +400,9 @@ class _MesasScreenState extends State<MesasScreen> {
                     // -------------------------------------------------------------
                     Container(
                       width: 310,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border(right: BorderSide(color: Colors.grey.shade300)),
+                      decoration: const BoxDecoration(
+                        color: kPanel,
+                        border: Border(right: BorderSide(color: kBorde)),
                       ),
                       padding: const EdgeInsets.all(20.0),
                       child: Column(
@@ -414,8 +416,12 @@ class _MesasScreenState extends State<MesasScreen> {
                                   Row(
                                     children: [
                                       const Expanded(
-                                        child: Text('Área / Zona',
-                                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                                        child: Text('ÁREA / ZONA',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                letterSpacing: 1.2,
+                                                fontWeight: FontWeight.w700,
+                                                color: kTextoSuave)),
                                       ),
                                       if (_admin) ...[
                                         IconButton(
@@ -447,14 +453,19 @@ class _MesasScreenState extends State<MesasScreen> {
                                     },
                                   ),
                                   const SizedBox(height: 20),
-                                  const Text('Personas (Covers)',
-                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                                  const Text('PERSONAS (COVERS)',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          letterSpacing: 1.2,
+                                          fontWeight: FontWeight.w700,
+                                          color: kTextoSuave)),
                                   const SizedBox(height: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey.shade300),
-                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.white,
+                                      border: Border.all(color: kBorde),
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -484,9 +495,9 @@ class _MesasScreenState extends State<MesasScreen> {
                                       onPressed: _nuevaMesa,
                                       style: OutlinedButton.styleFrom(
                                         minimumSize: const Size(double.infinity, 44),
-                                        side: const BorderSide(color: kVerde),
-                                        foregroundColor: kVerde,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        side: const BorderSide(color: kTexto),
+                                        foregroundColor: kTexto,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                       ),
                                       icon: const Icon(Icons.add_rounded),
                                       label: const Text('Agregar Mesa', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -524,7 +535,7 @@ class _MesasScreenState extends State<MesasScreen> {
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: kCafe,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                 ),
                                 onPressed: _ocupado ? null : () => _cobrar(mesa),
                                 icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 20),
@@ -545,8 +556,8 @@ class _MesasScreenState extends State<MesasScreen> {
                             height: 48,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: kVerde,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                backgroundColor: kEstadoLibre,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
                               onPressed: (mesa == null || _ocupado)
                                   ? null
@@ -574,6 +585,7 @@ class _MesasScreenState extends State<MesasScreen> {
                     Expanded(child: _buildPlano()),
                   ],
                 ),
+      ),
     );
   }
 
@@ -587,31 +599,20 @@ class _MesasScreenState extends State<MesasScreen> {
   }
 
   Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(_error ?? '', textAlign: TextAlign.center),
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(onPressed: () => _cargar(), child: const Text('Reintentar')),
-        ],
-      ),
-    );
+    return ErrorConexion(mensajeError: _error ?? '', onReintentar: () => _cargar());
   }
 
   Widget _buildFichaMesa(Mesa mesa, List<Mesa> miembros, double totalCuenta) {
     final color = _colorEstado(mesa.estado);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAF8F5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorde),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -621,7 +622,7 @@ class _MesasScreenState extends State<MesasScreen> {
               Expanded(
                 child: Text(
                   miembros.length > 1 ? 'Mesas ${miembros.map((m) => m.numero).join('+')}' : 'Mesa ${mesa.numero}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kTexto),
                 ),
               ),
               PopupMenuButton<String>(
@@ -657,17 +658,11 @@ class _MesasScreenState extends State<MesasScreen> {
           const SizedBox(height: 4),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(_etiquetaEstado(mesa.estado),
-                    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
+              EtiquetaEstado(_etiquetaEstado(mesa.estado), color),
               const SizedBox(width: 8),
-              Text('Capacidad: ${mesa.capacidad}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+              const Icon(Icons.groups_rounded, size: 16, color: kTextoSuave),
+              const SizedBox(width: 4),
+              Text('Capacidad: ${mesa.capacidad} pers.', style: const TextStyle(fontSize: 12, color: kTextoSuave)),
             ],
           ),
           if (mesa.idOrden != null) ...[
@@ -694,35 +689,32 @@ class _MesasScreenState extends State<MesasScreen> {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 2)),
+                  color: kTexto,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.layers_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(areaNombre.isEmpty ? 'Sin áreas' : areaNombre,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                    const SizedBox(width: 10),
+                    Text('${enArea.length} mesas',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
                   ],
                 ),
-                child: Text(areaNombre.isEmpty ? 'Sin áreas' : areaNombre,
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: kVerde)),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
-                    for (final e in ['disponible', 'ocupada', 'por_limpiar', 'reservada'])
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(color: _colorEstado(e), shape: BoxShape.circle)),
-                          const SizedBox(width: 4),
-                          Text(_etiquetaEstado(e), style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                        ],
-                      ),
+                    for (final e in ['disponible', 'ocupada', 'reservada', 'por_limpiar'])
+                      LeyendaPill(_colorEstado(e), _etiquetaEstado(e)),
                   ],
                 ),
               ),
@@ -734,7 +726,7 @@ class _MesasScreenState extends State<MesasScreen> {
               ? Center(
                   child: Text(
                     _admin ? 'No hay mesas en esta área. Usa "Agregar Mesa".' : 'No hay mesas en esta área.',
-                    style: TextStyle(color: Colors.grey.shade500),
+                    style: const TextStyle(color: kTextoSuave),
                   ),
                 )
               : LayoutBuilder(
@@ -823,8 +815,12 @@ class _MesaDialogState extends State<_MesaDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
+
+  Widget _dialogo() {
     return AlertDialog(
+      backgroundColor: kPanel,
+      shape: kFormaDialogo,
       title: Text(widget.mesa == null ? 'Nueva mesa' : 'Editar mesa'),
       content: SizedBox(
         width: 320,
@@ -834,13 +830,13 @@ class _MesaDialogState extends State<_MesaDialog> {
             children: [
               TextField(
                 controller: _numero,
-                decoration: const InputDecoration(labelText: 'Número / nombre (ej. 4, T1, B2)', border: OutlineInputBorder()),
+                decoration: campo('Número / nombre (ej. 4, T1, B2)'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _capacidad,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Capacidad (personas)', border: OutlineInputBorder()),
+                decoration: campo('Capacidad (personas)'),
               ),
               const SizedBox(height: 12),
               Selector<int>(
@@ -917,8 +913,12 @@ class _PagoDialogState extends State<_PagoDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
+
+  Widget _dialogo() {
     return AlertDialog(
+      backgroundColor: kPanel,
+      shape: kFormaDialogo,
       title: Text('Cobrar Mesa ${widget.etiqueta}'),
       content: SizedBox(
         width: 340,
@@ -949,7 +949,7 @@ class _PagoDialogState extends State<_PagoDialog> {
                 TextField(
                   controller: _recibido,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Efectivo recibido', prefixText: '\$ ', border: OutlineInputBorder()),
+                  decoration: campo('Efectivo recibido', prefixText: '\$ '),
                   onChanged: (_) => setState(() => _error = null),
                 ),
                 const SizedBox(height: 8),
@@ -960,7 +960,7 @@ class _PagoDialogState extends State<_PagoDialog> {
               TextField(
                 controller: _propina,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Propina (opcional)', prefixText: '\$ ', border: OutlineInputBorder()),
+                decoration: campo('Propina (opcional)', prefixText: '\$ '),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),

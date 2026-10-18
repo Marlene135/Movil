@@ -1,6 +1,7 @@
 // vista del teclado de pin para el login de usuario
 import 'package:flutter/material.dart';
 import '../widgets/keypadbutton.dart';
+import '../widgets/ui.dart' show kFondo, kCafe;
 import '../servicios/db_service.dart';
 import 'dashboard.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -115,6 +116,7 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kFondo,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -123,11 +125,12 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
               constraints: const BoxConstraints(maxWidth: 380),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               decoration: BoxDecoration(
-                color: const Color(0xFFFAF8F5),
+                color: const Color(0xFFFDFBF8),
                 borderRadius: BorderRadius.circular(36),
+                border: Border.all(color: const Color(0xFFE5DFD4)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
@@ -139,15 +142,14 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                   Container(
                     width: 68,
                     height: 68,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1EDE6),
+                    decoration: const BoxDecoration(
+                      color: kCafe,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE5DFD4), width: 1),
                     ),
                     child: const Icon(
                       Icons.room_service_rounded,
                       size: 32,
-                      color: Color(0xFF26201B),
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 14),

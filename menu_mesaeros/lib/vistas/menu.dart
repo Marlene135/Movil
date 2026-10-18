@@ -221,90 +221,99 @@ class _MenuVistaState extends State<MenuVista> {
   Color _colorEstadoItem(String e) {
     switch (e) {
       case 'EN_PREPARACION':
-        return const Color(0xFFE6A800);
+        return const Color(0xFFD99A00);
       case 'LISTO':
-        return kVerde;
+        return kEstadoLibre;
       case 'ENTREGADO':
         return Colors.grey;
       default:
-        return const Color(0xFF6488E4);
+        return kEstadoLimpiar;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final mesaSel = _mesas.where((m) => m.id == _mesaId).toList();
-    final String tituloHeader = 'Menú - ${widget.usuario?['nombre'] ?? 'Cajero Principal'}';
+    final String tituloHeader = 'Venta rápida · ${widget.usuario?['nombre'] ?? 'Cajero Principal'}';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        elevation: 0.5,
-        backgroundColor: const Color.fromARGB(255, 162, 139, 246),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(tituloHeader,
-            style: const TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.normal)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: 'Actualizar',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.black87),
-            onPressed: () => _cargar(),
+    return TemaSazon(
+      child: Scaffold(
+        backgroundColor: kFondo,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: kFondo,
+          surfaceTintColor: Colors.transparent,
+          toolbarHeight: 72,
+          leadingWidth: 56,
+          leading: BotonRedondo(
+            icono: Icons.arrow_back_rounded,
+            tooltip: 'Volver',
+            onPressed: () => Navigator.pop(context),
           ),
-        ],
-        bottom: _ocupado
-            ? const PreferredSize(
-                preferredSize: Size.fromHeight(3),
-                child: LinearProgressIndicator(minHeight: 3, color: kVerde))
-            : null,
-      ),
-      body: _cargando
-          ? const Center(child: CircularProgressIndicator(color: kCafe))
-          : _error != null
-              ? Center(
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
-                    const SizedBox(height: 12),
-                    Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(_error!, textAlign: TextAlign.center)),
-                    const SizedBox(height: 12),
-                    ElevatedButton(onPressed: () => _cargar(), child: const Text('Reintentar')),
+          titleSpacing: 4,
+          title: TituloPagina('Menú / Caja POS', subtitulo: tituloHeader, icono: Icons.point_of_sale_rounded),
+          actions: [
+            BotonRedondo(
+              tooltip: 'Actualizar',
+              icono: Icons.refresh_rounded,
+              onPressed: () => _cargar(),
+            ),
+            const SizedBox(width: 8),
+          ],
+          bottom: _ocupado
+              ? const PreferredSize(
+                  preferredSize: Size.fromHeight(3),
+                  child: LinearProgressIndicator(minHeight: 3, color: kEstadoLibre))
+              : null,
+        ),
+        body: _cargando
+            ? const Center(child: CircularProgressIndicator(color: kCafe))
+            : _error != null
+                ? ErrorConexion(mensajeError: _error!, onReintentar: () => _cargar())
+                : Row(children: [
+                    _buildColumnaMesas(),
+                    Expanded(child: _buildCentro()),
+                    _buildComanda(mesaSel.isEmpty ? null : mesaSel.first),
                   ]),
-                )
-              : Row(children: [
-                  _buildColumnaMesas(),
-                  Expanded(child: _buildCentro()),
-                  _buildComanda(mesaSel.isEmpty ? null : mesaSel.first),
-                ]),
+      ),
     );
+  }
+
+  Color _colorMesa(String estado) {
+    switch (estado) {
+      case 'ocupada':
+        return kEstadoOcupada;
+      case 'reservada':
+        return kEstadoReservada;
+      case 'por_limpiar':
+        return kEstadoLimpiar;
+      default:
+        return kEstadoLibre;
+    }
   }
 
   // 1. COLUMNA IZQUIERDA: MESAS
   Widget _buildColumnaMesas() {
     return Container(
-      width: 260,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: Colors.grey.shade200)),
+      width: 250,
+      decoration: const BoxDecoration(
+        color: kPanel,
+        border: Border(right: BorderSide(color: kBorde)),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Mesas Salón',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color.fromARGB(221, 161, 141, 141))),
+          const Text('MESAS SALÓN',
+              style: TextStyle(fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w700, color: kTextoSuave)),
           const SizedBox(height: 12),
           Expanded(
             child: _mesas.isEmpty
-                ? Center(child: Text('No hay mesas', style: TextStyle(color: Colors.grey.shade500)))
+                ? const Center(child: Text('No hay mesas', style: TextStyle(color: kTextoSuave)))
                 : GridView.builder(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      childAspectRatio: 1.3,
+                      childAspectRatio: 1.15,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
                     ),
@@ -312,44 +321,59 @@ class _MenuVistaState extends State<MenuVista> {
                     itemBuilder: (context, index) {
                       final mesa = _mesas[index];
                       final bool isSelected = _mesaId == mesa.id;
-                      final bool isOcupada = mesa.estado == 'ocupada';
+                      final Color acento = _colorMesa(mesa.estado);
                       return GestureDetector(
                         onTap: () => _seleccionarMesa(mesa.id),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFFE8F5E9) : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: isSelected ? kVerde : Colors.grey.shade300,
+                              color: isSelected ? kTexto : kBorde,
                               width: isSelected ? 2 : 1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isSelected ? 0.10 : 0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
                           ),
+                          clipBehavior: Clip.antiAlias,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Flexible(
-                                    child: Text('Mesa ${mesa.numero}',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected ? kVerde : Colors.black87)),
+                              Container(height: 5, color: acento),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Mesa ${mesa.numero}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w800, fontSize: 15, color: kTexto)),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.groups_rounded, size: 14, color: kTextoSuave),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text('${mesa.capacidad} pers.',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 11, color: kTextoSuave)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                        shape: BoxShape.circle, color: isOcupada ? Colors.orange : kVerde),
-                                  )
-                                ],
+                                ),
                               ),
-                              Text('${mesa.capacidad} personas',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                             ],
                           ),
                         ),
@@ -374,27 +398,12 @@ class _MenuVistaState extends State<MenuVista> {
             Expanded(
               child: TextField(
                 onChanged: (v) => setState(() => _busqueda = v),
-                decoration: InputDecoration(
-                  hintText: 'Buscar producto...',
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
-                ),
+                decoration: campo(null, hint: 'Buscar platillo...', icono: Icons.search),
               ),
             ),
             if (_admin) ...[
               const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: () => _editarProducto(),
-                style: ElevatedButton.styleFrom(backgroundColor: kVerde, foregroundColor: Colors.white),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Producto'),
-              ),
+              BotonOscuro('Producto', icono: Icons.add, onPressed: () => _editarProducto()),
             ],
           ]),
           const SizedBox(height: 16),
@@ -402,39 +411,31 @@ class _MenuVistaState extends State<MenuVista> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _chip('Todos', _categoriaId == null, () => setState(() => _categoriaId = null)),
+                _chip('Todas', _categoriaId == null, () => setState(() => _categoriaId = null)),
                 ..._categoriasVisibles.map((c) => _chip(
                       c.nombre,
                       _categoriaId == c.id,
                       () => setState(() => _categoriaId = c.id),
                       onLong: _admin ? () => _editarCategoria(c) : null,
                     )),
-                if (_admin)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ActionChip(
-                      avatar: const Icon(Icons.add, size: 16),
-                      label: const Text('Categoría'),
-                      onPressed: _nuevaCategoria,
-                    ),
-                  ),
+                if (_admin) _chip('+ Categoría', false, _nuevaCategoria),
               ],
             ),
           ),
           if (_admin)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
               child: Text('Mantén presionada una categoría para editarla u ocultarla.',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                  style: TextStyle(fontSize: 10, color: kTextoSuave)),
             ),
           const SizedBox(height: 12),
           Expanded(
             child: productos.isEmpty
-                ? Center(child: Text('No hay productos para mostrar', style: TextStyle(color: Colors.grey.shade500)))
+                ? const Center(child: Text('No hay productos para mostrar', style: TextStyle(color: kTextoSuave)))
                 : GridView.builder(
                     gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 220,
-                      childAspectRatio: 0.85,
+                      maxCrossAxisExtent: 230,
+                      childAspectRatio: 1.0,
                       crossAxisSpacing: 14,
                       mainAxisSpacing: 14,
                     ),
@@ -448,20 +449,7 @@ class _MenuVistaState extends State<MenuVista> {
   }
 
   Widget _chip(String texto, bool sel, VoidCallback onTap, {VoidCallback? onLong}) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: GestureDetector(
-        onLongPress: onLong,
-        child: ChoiceChip(
-          label: Text(texto),
-          selected: sel,
-          selectedColor: kVerde,
-          backgroundColor: Colors.white,
-          labelStyle: TextStyle(color: sel ? Colors.white : Colors.black87, fontWeight: FontWeight.w600),
-          onSelected: (_) => onTap(),
-        ),
-      ),
-    );
+    return PillChip(texto: texto, seleccionado: sel, onTap: onTap, onLong: onLong);
   }
 
   Widget _buildProducto(Producto prod) {
@@ -469,48 +457,87 @@ class _MenuVistaState extends State<MenuVista> {
     return GestureDetector(
       onTap: () => _agregar(prod),
       child: Opacity(
-        opacity: vendible ? 1 : 0.5,
+        opacity: vendible ? 1 : 0.55,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
+            color: kPanel,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: kBorde),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Text(!prod.activo ? 'Desactivado' : (!prod.disponible ? 'Agotado' : ''),
-                        style: const TextStyle(fontSize: 10, color: kRojo, fontWeight: FontWeight.bold)),
+                  // Insignia oscura con la categoría
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(color: kTexto, borderRadius: BorderRadius.circular(20)),
+                      child: Text(
+                        prod.categoria.isEmpty ? 'General' : prod.categoria,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   ),
+                  const Spacer(),
                   if (_admin)
                     InkWell(
                       onTap: () => _editarProducto(prod),
-                      child: const Icon(Icons.edit_outlined, size: 18, color: Colors.grey),
+                      child: const Icon(Icons.edit_outlined, size: 18, color: kTextoSuave),
                     ),
                 ],
               ),
-              Center(child: Text(prod.emoji, style: const TextStyle(fontSize: 38))),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(prod.emoji, style: const TextStyle(fontSize: 22)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(prod.nombre,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 15, color: kTexto, height: 1.2)),
+                  ),
+                ],
+              ),
+              if (!vendible) ...[
+                const SizedBox(height: 4),
+                EtiquetaEstado(!prod.activo ? 'Desactivado' : 'Agotado', kRojo, suave: true),
+              ] else if (prod.descripcion.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(prod.descripcion,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: kTextoSuave, fontSize: 11)),
+              ],
               const Spacer(),
-              Text(prod.nombre,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87)),
-              const SizedBox(height: 2),
-              Text(prod.descripcion.isEmpty ? prod.categoria : prod.descripcion,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
-              const SizedBox(height: 8),
-              Text(dinero(prod.precio),
-                  style: const TextStyle(color: kVerde, fontWeight: FontWeight.bold, fontSize: 15)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(dinero(prod.precio),
+                      style: const TextStyle(color: kPrecio, fontWeight: FontWeight.w800, fontSize: 19)),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: kBorde),
+                    ),
+                    child: const Icon(Icons.add_rounded, size: 18, color: kTexto),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -518,52 +545,68 @@ class _MenuVistaState extends State<MenuVista> {
     );
   }
 
-  // 3. COLUMNA DERECHA: COMANDA
+  // 3. COLUMNA DERECHA: COMANDA (Orden actual)
   Widget _buildComanda(Mesa? mesa) {
     final enviados = _orden?.items ?? <OrdenItem>[];
     final borrador = _borrador;
     final vacio = enviados.isEmpty && borrador.isEmpty;
+    const etiquetaSeccion =
+        TextStyle(fontSize: 10, letterSpacing: 1.1, color: kTextoSuave, fontWeight: FontWeight.w700);
     return Container(
-      width: 300,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(left: BorderSide(color: Colors.grey.shade200)),
+      width: 310,
+      decoration: const BoxDecoration(
+        color: kPanel,
+        border: Border(left: BorderSide(color: kBorde)),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Comanda', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
-              if (mesa != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(12)),
-                  child: Text('Mesa ${mesa.numero}',
-                      style: const TextStyle(color: kVerde, fontWeight: FontWeight.bold, fontSize: 12)),
-                ),
+              const Icon(Icons.receipt_long_rounded, size: 24, color: kTexto),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Orden Actual',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kTexto)),
+              ),
+              if (mesa != null) EtiquetaEstado('Mesa ${mesa.numero}', kEstadoLibre),
             ],
           ),
           if (_orden != null)
-            Text(_orden!.folio, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 32),
+              child: Text(_orden!.folio, style: const TextStyle(fontSize: 11, color: kTextoSuave)),
+            ),
           const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
           Expanded(
             child: vacio
-                ? Center(
-                    child: Text('Toca un producto para agregarlo a la comanda',
-                        textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                ? const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shopping_cart_rounded, size: 46, color: Color(0xFFB9B2A8)),
+                        SizedBox(height: 12),
+                        Text('La orden está vacía.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF5E5850), fontSize: 13, fontWeight: FontWeight.w500)),
+                        Text('Selecciona productos o una mesa.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Color(0xFF5E5850), fontSize: 13, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   )
                 : ListView(
                     children: [
                       if (enviados.isNotEmpty) ...[
-                        Text('ENVIADO', style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+                        const Text('ENVIADO', style: etiquetaSeccion),
                         ...enviados.map(_filaEnviada),
                         const Divider(),
                       ],
                       if (borrador.isNotEmpty) ...[
-                        Text('POR ENVIAR', style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+                        const Text('POR ENVIAR', style: etiquetaSeccion),
                         ...borrador.map(_filaBorrador),
                       ],
                     ],
@@ -572,29 +615,32 @@ class _MenuVistaState extends State<MenuVista> {
           const Divider(),
           if (enviados.isNotEmpty)
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Ya enviado:', style: TextStyle(fontSize: 13, color: Colors.black54)),
-              Text(dinero(_totalEnviado), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const Text('Ya enviado', style: TextStyle(fontSize: 14, color: kTextoSuave)),
+              Text(dinero(_totalEnviado), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             ]),
           const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text('Total:', style: TextStyle(fontSize: 16, color: Colors.black54)),
+              const Text('Total a Pagar', style: TextStyle(fontSize: 15, color: kTextoSuave)),
               Text(dinero(_totalEnviado + _totalBorrador),
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kVerde)),
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: kPrecio)),
             ],
           ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
+            height: 52,
+            child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: kVerde,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                backgroundColor: kTexto,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               onPressed: (borrador.isEmpty || _ocupado) ? null : _enviar,
-              child: const Text('Enviar a Cocina', style: TextStyle(fontSize: 16, color: Colors.white)),
+              icon: const Icon(Icons.send_rounded, size: 18),
+              label: const Text('Enviar a Cocina', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -605,7 +651,7 @@ class _MenuVistaState extends State<MenuVista> {
   Widget _filaEnviada(OrdenItem it) {
     final color = _colorEstadoItem(it.estado);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -614,26 +660,22 @@ class _MenuVistaState extends State<MenuVista> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${it.cantidad} × ${it.nombre}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTexto)),
                 if (it.notas.isNotEmpty)
-                  Text(it.notas, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
-                Container(
-                  margin: const EdgeInsets.only(top: 3),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                  child: Text(etiquetaEstadoItem(it.estado),
-                      style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
-                ),
+                  Text(it.notas,
+                      style: const TextStyle(fontSize: 11, color: kTextoSuave, fontStyle: FontStyle.italic)),
+                const SizedBox(height: 3),
+                EtiquetaEstado(etiquetaEstadoItem(it.estado), color, suave: true),
               ],
             ),
           ),
-          Text(dinero(it.subtotal), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(dinero(it.subtotal), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
           if (it.estado != 'ENTREGADO')
             InkWell(
               onTap: _ocupado ? null : () => _cancelarItem(it),
               child: const Padding(
                 padding: EdgeInsets.only(left: 6),
-                child: Icon(Icons.close, size: 16, color: kRojo),
+                child: Icon(Icons.close_rounded, size: 18, color: kRojo),
               ),
             ),
         ],
@@ -642,8 +684,14 @@ class _MenuVistaState extends State<MenuVista> {
   }
 
   Widget _filaBorrador(_Borrador b) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorde),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -653,33 +701,35 @@ class _MenuVistaState extends State<MenuVista> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(b.producto.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(b.producto.nombre,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTexto)),
                 InkWell(
                   onTap: () => _notaBorrador(b),
                   child: Text(b.notas.isEmpty ? '+ nota' : b.notas,
-                      style: TextStyle(fontSize: 11, color: b.notas.isEmpty ? kVerde : Colors.grey.shade600)),
+                      style: TextStyle(fontSize: 11, color: b.notas.isEmpty ? kVerde : kTextoSuave)),
                 ),
+                const SizedBox(height: 4),
                 Row(children: [
                   InkWell(
                     onTap: () => setState(() {
                       b.cantidad--;
                       if (b.cantidad <= 0) _borradores[_mesaId]?.remove(b);
                     }),
-                    child: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.redAccent),
+                    child: const Icon(Icons.remove_circle_outline, size: 22, color: kEstadoOcupada),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('${b.cantidad}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('${b.cantidad}', style: const TextStyle(fontWeight: FontWeight.w800)),
                   ),
                   InkWell(
                     onTap: () => setState(() => b.cantidad++),
-                    child: const Icon(Icons.add_circle_outline, size: 20, color: kVerde),
+                    child: const Icon(Icons.add_circle_outline, size: 22, color: kEstadoLibre),
                   ),
                 ]),
               ],
             ),
           ),
-          Text(dinero(b.producto.precio * b.cantidad), style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(dinero(b.producto.precio * b.cantidad), style: const TextStyle(fontWeight: FontWeight.w800)),
         ],
       ),
     );
@@ -756,8 +806,12 @@ class _ProductoDialogState extends State<_ProductoDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
+
+  Widget _dialogo() {
     return AlertDialog(
+      backgroundColor: kPanel,
+      shape: kFormaDialogo,
       title: Text(widget.producto == null ? 'Nuevo producto' : 'Editar producto'),
       content: SizedBox(
         width: 360,
@@ -765,16 +819,16 @@ class _ProductoDialogState extends State<_ProductoDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: _nombre, decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder())),
+              TextField(controller: _nombre, decoration: campo('Nombre')),
               const SizedBox(height: 12),
-              TextField(controller: _desc, maxLines: 2, decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder())),
+              TextField(controller: _desc, maxLines: 2, decoration: campo('Descripción')),
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
                   child: TextField(
                     controller: _precio,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Precio', prefixText: '\$ ', border: OutlineInputBorder()),
+                    decoration: campo('Precio', prefixText: '\$ '),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -782,7 +836,7 @@ class _ProductoDialogState extends State<_ProductoDialog> {
                   child: TextField(
                     controller: _tiempo,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Minutos prep.', border: OutlineInputBorder()),
+                    decoration: campo('Minutos prep.'),
                   ),
                 ),
               ]),
@@ -848,15 +902,19 @@ class _CategoriaDialogState extends State<_CategoriaDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
+
+  Widget _dialogo() {
     return AlertDialog(
+      backgroundColor: kPanel,
+      shape: kFormaDialogo,
       title: Text(widget.categoria == null ? 'Nueva categoría' : 'Editar categoría'),
       content: SizedBox(
         width: 320,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: _nombre, decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder())),
+            TextField(controller: _nombre, decoration: campo('Nombre')),
             const SizedBox(height: 12),
             Selector<String>(
               etiqueta: 'Estación que la prepara',
