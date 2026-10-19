@@ -1,0 +1,870 @@
+// vistas/mesas.dart - Plano de mesas conectado a la base de datos:
+// asignación, fusión/movimiento en conjunto (se guarda), cobro y administración.
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import '../modulos/conv.dart';
+import '../modulos/orden.dart';
+import '../modulos/usuario.dart';
+import '../servicios/api_service.dart';
+import '../servicios/db_service.dart';
+import '../widgets/MesaWidget.dart';
+import '../widgets/ui.dart';
+import 'menu.dart';
+
+class MesasScreen extends StatefulWidget {
+  final Map<String, dynamic>? usuario;
+
+  const MesasScreen({super.key, this.usuario});
+
+  @override
+  State<MesasScreen> createState() => _MesasScreenState();
+}
+
+class _MesasScreenState extends State<MesasScreen> {
+  int _personas = 2;
+  int? _areaId;
+  int? _mesaSeleccionadaId;
+
+  List<Area> _areas = [];
+  List<Mesa> _mesas = [];
+  bool _cargando = true;
+  bool _ocupado = false;
+  bool _huboMovimiento = false;
+  String? _error;
+
+  bool get _admin => esAdmin(widget.usuario);
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  // ------------------------------------------------------------ Datos
+  Future<void> _cargar({bool silencioso = false}) async {
+    if (!silencioso && mounted) setState(() => _cargando = true);
+    try {
+      final res = await Future.wait([DbService.obtenerAreas(), DbService.obtenerMesas()]);
+      if (!mounted) return;
+      final areas = res[0] as List<Area>;
+      final mesas = res[1] as List<Mesa>;
+      _acomodarPorDefecto(mesas);
+      setState(() {
+        _areas = areas;
+        _mesas = mesas;
+        if (_areaId == null || !areas.any((a) => a.id == _areaId)) {
+          _areaId = areas.isNotEmpty ? areas.first.id : null;
+        }
+        if (_mesaSeleccionadaId != null && !mesas.any((m) => m.id == _mesaSeleccionadaId)) {
+          _mesaSeleccionadaId = null;
+        }
+        _error = null;
+        _cargando = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.mensaje;
+        _cargando = false;
+      });
+    }
+  }
+
+  /// Las mesas que todavía no tienen posición (0,0) se acomodan en una cuadrícula.
+  void _acomodarPorDefecto(List<Mesa> mesas) {
+    final porArea = <int?, int>{};
+    for (final m in mesas) {
+      if (m.x == 0 && m.y == 0) {
+        final i = porArea[m.idArea] ?? 0;
+        m.x = 30.0 + (i % 5) * 110;
+        m.y = 30.0 + (i ~/ 5) * 110;
+        porArea[m.idArea] = i + 1;
+      }
+    }
+  }
+
+  /// Ejecuta una acción contra el servidor mostrando el error si falla y recargando después.
+  Future<void> _run(Future<void> Function() accion, {String? exito}) async {
+    setState(() => _ocupado = true);
+    try {
+      await accion();
+      if (exito != null && mounted) mensaje(context, exito);
+    } on ApiException catch (e) {
+      if (mounted) mensaje(context, e.mensaje, error: true);
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+    await _cargar(silencioso: true);
+  }
+
+  List<Mesa> get _mesasArea => _mesas.where((m) => m.idArea == _areaId).toList();
+
+  Mesa? get _mesaSel {
+    if (_mesaSeleccionadaId == null) return null;
+    for (final m in _mesas) {
+      if (m.id == _mesaSeleccionadaId) return m;
+    }
+    return null;
+  }
+
+  List<Mesa> _grupoDe(Mesa m) =>
+      m.grupo == null ? [m] : _mesas.where((x) => x.grupo == m.grupo).toList();
+
+  // ------------------------------------------- Movimiento y fusión
+  void _moverMesaOGrupo(Mesa principal, Offset delta, BoxConstraints c) {
+    _huboMovimiento = true;
+    setState(() {
+      for (final m in _grupoDe(principal)) {
+        m.x = (m.x + delta.dx).clamp(4.0, math.max(4.0, c.maxWidth - 70)).toDouble();
+        m.y = (m.y + delta.dy).clamp(4.0, math.max(4.0, c.maxHeight - 70)).toDouble();
+      }
+    });
+  }
+
+  Future<void> _soltarMesa(Mesa mesa) async {
+    if (!_huboMovimiento) return;
+    _huboMovimiento = false;
+
+    Mesa? cercana;
+    for (final otra in _mesasArea) {
+      if (otra.id == mesa.id) continue;
+      if (mesa.grupo != null && otra.grupo == mesa.grupo) continue; // ya están unidas
+      if ((mesa.x - otra.x).abs() < 65 && (mesa.y - otra.y).abs() < 65) {
+        cercana = otra;
+        break;
+      }
+    }
+
+    List<Mesa> afectadas;
+    if (cercana != null) {
+      final otra = cercana;
+      final nuevoGrupo = otra.grupo ?? otra.id;
+      final miembrosMesa = _grupoDe(mesa);
+      final miembrosOtra = _grupoDe(otra);
+      // Ajuste magnético: la mesa (y su grupo) se pega junto a la otra
+      final destinoX = otra.x + ((mesa.x - otra.x) > 0 ? 62.0 : -62.0);
+      final ddx = destinoX - mesa.x;
+      final ddy = otra.y - mesa.y;
+      setState(() {
+        for (final m in miembrosMesa) {
+          m.x = math.max(4.0, m.x + ddx);
+          m.y = math.max(4.0, m.y + ddy);
+          m.grupo = nuevoGrupo;
+        }
+        for (final m in miembrosOtra) {
+          m.grupo = nuevoGrupo;
+        }
+      });
+      afectadas = [...miembrosMesa, ...miembrosOtra];
+      if (mounted) mensaje(context, '¡Mesa ${mesa.numero} unida con Mesa ${otra.numero}!');
+    } else {
+      afectadas = _grupoDe(mesa);
+    }
+
+    try {
+      await DbService.guardarLayout(afectadas);
+    } on ApiException catch (e) {
+      if (mounted) mensaje(context, 'No se pudo guardar la posición: ${e.mensaje}', error: true);
+      await _cargar(silencioso: true);
+    }
+  }
+
+  Future<void> _separarGrupo(Mesa mesa) async {
+    final miembros = _grupoDe(mesa);
+    if (miembros.length < 2) return;
+    double desplazamiento = 0;
+    for (final m in miembros) {
+      m.grupo = null;
+      m.x += desplazamiento;
+      desplazamiento += 25;
+    }
+    setState(() {});
+    await _run(() => DbService.guardarLayout(miembros), exito: 'Las mesas se separaron.');
+  }
+
+  // --------------------------------------------------------- Acciones
+  Future<void> _asignar(Mesa mesa) async {
+    final miembros = _grupoDe(mesa);
+    await _run(() async {
+      await DbService.abrirMesa(mesa.id, _personas);
+      for (final m in miembros) {
+        if (m.id != mesa.id && m.estado != 'ocupada') {
+          await DbService.actualizarMesa(m.id, {'estado': 'ocupada'});
+        }
+      }
+    });
+    if (!mounted) return;
+    final nombre = miembros.length > 1 ? 'Mesas unidas' : 'Mesa ${mesa.numero}';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('$nombre asignada para $_personas personas.'),
+        action: SnackBarAction(label: 'Tomar comanda', onPressed: () => _irAMenu(mesa)),
+      ));
+  }
+
+  void _irAMenu(Mesa mesa) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => MenuVista(usuario: widget.usuario, idMesaInicial: mesa.id)),
+    ).then((_) => _cargar(silencioso: true));
+  }
+
+  Future<void> _cambiarEstado(Mesa mesa, String estado) async {
+    await _run(() => DbService.actualizarMesa(mesa.id, {'estado': estado}));
+  }
+
+  Future<void> _cancelarCuenta(Mesa mesa) async {
+    final ok = await confirmar(context, 'Cancelar cuenta',
+        '¿Cancelar la cuenta de la Mesa ${mesa.numero}? Se anularán todos sus platillos.',
+        aceptar: 'Cancelar cuenta', peligro: true);
+    if (!ok || mesa.idOrden == null) return;
+    await _run(() => DbService.cancelarOrden(mesa.idOrden!), exito: 'Cuenta cancelada.');
+  }
+
+  // ----------------------------------------------- Administración
+  Future<void> _nuevaMesa() async {
+    final datos = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _MesaDialog(areas: _areas, areaInicial: _areaId, sugerencia: '${_mesas.length + 1}'),
+    );
+    if (datos == null) return;
+    await _run(() async {
+      final m = await DbService.crearMesa(
+        numero: datos['numero'] as String,
+        capacidad: datos['capacidad'] as int,
+        idArea: datos['id_area'] as int?,
+      );
+      _mesaSeleccionadaId = m.id;
+      if (datos['id_area'] != null) _areaId = datos['id_area'] as int?;
+    }, exito: 'Mesa agregada.');
+  }
+
+  Future<void> _editarMesa(Mesa mesa) async {
+    final datos = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _MesaDialog(areas: _areas, areaInicial: mesa.idArea, mesa: mesa),
+    );
+    if (datos == null) return;
+    await _run(() => DbService.actualizarMesa(mesa.id, datos), exito: 'Mesa actualizada.');
+  }
+
+  Future<void> _eliminarMesa(Mesa mesa) async {
+    final ok = await confirmar(context, 'Eliminar mesa', '¿Eliminar la Mesa ${mesa.numero}? Esta acción no se puede deshacer.',
+        aceptar: 'Eliminar', peligro: true);
+    if (!ok) return;
+    _mesaSeleccionadaId = null;
+    await _run(() => DbService.eliminarMesa(mesa.id), exito: 'Mesa eliminada.');
+  }
+
+  Future<void> _nuevaArea() async {
+    final nombre = await pedirTexto(context, 'Nueva área', etiqueta: 'Nombre del área');
+    if (nombre == null) return;
+    await _run(() async {
+      final a = await DbService.crearArea(nombre);
+      _areaId = a.id;
+    }, exito: 'Área creada.');
+  }
+
+  Future<void> _renombrarArea() async {
+    final area = _areas.where((a) => a.id == _areaId).toList();
+    if (area.isEmpty) return;
+    final nombre = await pedirTexto(context, 'Renombrar área', inicial: area.first.nombre, etiqueta: 'Nombre del área');
+    if (nombre == null) return;
+    await _run(() => DbService.renombrarArea(area.first.id, nombre), exito: 'Área actualizada.');
+  }
+
+  Future<void> _eliminarArea() async {
+    final area = _areas.where((a) => a.id == _areaId).toList();
+    if (area.isEmpty) return;
+    final ok = await confirmar(context, 'Eliminar área', '¿Eliminar el área "${area.first.nombre}"?',
+        aceptar: 'Eliminar', peligro: true);
+    if (!ok) return;
+    _areaId = null;
+    await _run(() => DbService.eliminarArea(area.first.id), exito: 'Área eliminada.');
+  }
+
+  // ------------------------------------------------------------ UI
+  String _etiquetaEstado(String e) {
+    switch (e) {
+      case 'ocupada':
+        return 'Ocupada';
+      case 'por_limpiar':
+        return 'Por limpiar';
+      case 'reservada':
+        return 'Reservada';
+      default:
+        return 'Disponible';
+    }
+  }
+
+  Color _colorEstado(String e) {
+    switch (e) {
+      case 'ocupada':
+        return kEstadoOcupada;
+      case 'por_limpiar':
+        return kEstadoLimpiar;
+      case 'reservada':
+        return kEstadoReservada;
+      default:
+        return kEstadoLibre;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String tituloHeader = 'Estado operativo, apertura y asignación · '
+        '${widget.usuario?['nombre'] ?? 'Cajero Principal'}';
+
+    final mesa = _mesaSel;
+    final bool tieneGrupoUnido = mesa != null && mesa.grupo != null && _grupoDe(mesa).length > 1;
+    final miembros = mesa == null ? <Mesa>[] : _grupoDe(mesa);
+    final double totalCuenta = miembros.fold<double>(0, (s, m) => s + m.totalActual);
+    final bool hayCuenta = miembros.any((m) => m.idOrden != null);
+
+    return TemaSazon(
+      child: Scaffold(
+      backgroundColor: kFondo,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: kFondo,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight: 72,
+        leadingWidth: 56,
+        leading: BotonRedondo(
+          icono: Icons.arrow_back_rounded,
+          tooltip: 'Volver',
+          onPressed: () => Navigator.pop(context),
+        ),
+        titleSpacing: 4,
+        title: TituloPagina('Mapa de Mesas', subtitulo: tituloHeader),
+        actions: [
+          BotonRedondo(
+            tooltip: 'Actualizar',
+            icono: Icons.refresh_rounded,
+            onPressed: () => _cargar(),
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: _ocupado
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(3),
+                child: LinearProgressIndicator(minHeight: 3, color: kEstadoLibre),
+              )
+            : null,
+      ),
+      body: _cargando
+          ? const Center(child: CircularProgressIndicator(color: kCafe))
+          : _error != null
+              ? _buildError()
+              : Row(
+                  children: [
+                    // -------------------------------------------------------------
+                    // PANEL IZQUIERDO: CONFIGURACIÓN Y PAGO
+                    // -------------------------------------------------------------
+                    Container(
+                      width: 310,
+                      decoration: const BoxDecoration(
+                        color: kPanel,
+                        border: Border(right: BorderSide(color: kBorde)),
+                      ),
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Expanded(
+                                        child: Text('ÁREA / ZONA',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                letterSpacing: 1.2,
+                                                fontWeight: FontWeight.w700,
+                                                color: kTextoSuave)),
+                                      ),
+                                      if (_admin) ...[
+                                        IconButton(
+                                          tooltip: 'Nueva área',
+                                          visualDensity: VisualDensity.compact,
+                                          icon: const Icon(Icons.add_circle_outline, size: 20),
+                                          onPressed: _nuevaArea,
+                                        ),
+                                        PopupMenuButton<String>(
+                                          tooltip: 'Opciones del área',
+                                          icon: const Icon(Icons.more_vert, size: 20),
+                                          onSelected: (v) => v == 'renombrar' ? _renombrarArea() : _eliminarArea(),
+                                          itemBuilder: (_) => const [
+                                            PopupMenuItem(value: 'renombrar', child: Text('Renombrar área')),
+                                            PopupMenuItem(value: 'eliminar', child: Text('Eliminar área')),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Selector<int>(
+                                    valor: _areaId,
+                                    items: _areas
+                                        .map((a) => DropdownMenuItem<int>(value: a.id, child: Text(a.nombre)))
+                                        .toList(),
+                                    onChanged: (v) {
+                                      if (v != null) setState(() => _areaId = v);
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+                                  const Text('PERSONAS (COVERS)',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          letterSpacing: 1.2,
+                                          fontWeight: FontWeight.w700,
+                                          color: kTextoSuave)),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      border: Border.all(color: kBorde),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('$_personas personas',
+                                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                        Row(
+                                          children: [
+                                            IconButton(
+                                              onPressed: _personas > 1 ? () => setState(() => _personas--) : null,
+                                              icon: const Icon(Icons.remove_circle_outline),
+                                              color: Colors.redAccent,
+                                            ),
+                                            IconButton(
+                                              onPressed: () => setState(() => _personas++),
+                                              icon: const Icon(Icons.add_circle_outline),
+                                              color: kVerde,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (_admin) ...[
+                                    const SizedBox(height: 16),
+                                    OutlinedButton.icon(
+                                      onPressed: _nuevaMesa,
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(double.infinity, 44),
+                                        side: const BorderSide(color: kTexto),
+                                        foregroundColor: kTexto,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      ),
+                                      icon: const Icon(Icons.add_rounded),
+                                      label: const Text('Agregar Mesa', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                  if (mesa != null) ...[
+                                    const SizedBox(height: 20),
+                                    _buildFichaMesa(mesa, miembros, totalCuenta),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Separar mesas unidas
+                          if (tieneGrupoUnido) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: _ocupado ? null : () => _separarGrupo(mesa),
+                                icon: const Icon(Icons.call_split_rounded, size: 18),
+                                label: const Text('Separar mesas'),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+
+                          // Cuenta por mesa (solo lectura: el cobro se hace en caja, no desde el móvil)
+                          if (mesa != null && hayCuenta) ...[
+                            _buildResumenCuenta(miembros, totalCuenta),
+                            const SizedBox(height: 10),
+                          ],
+
+                          // BOTÓN PRINCIPAL
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kEstadoLibre,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              onPressed: (mesa == null || _ocupado)
+                                  ? null
+                                  : () {
+                                      if (mesa.ocupada) {
+                                        _irAMenu(mesa);
+                                      } else {
+                                        _asignar(mesa);
+                                      }
+                                    },
+                              child: Text(
+                                _textoBotonPrincipal(mesa, tieneGrupoUnido, miembros),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // -------------------------------------------------------------
+                    // ÁREA DERECHA: PLANO CON MOVIMIENTO EN CONJUNTO
+                    // -------------------------------------------------------------
+                    Expanded(child: _buildPlano()),
+                  ],
+                ),
+      ),
+    );
+  }
+
+  String _textoBotonPrincipal(Mesa? mesa, bool unidas, List<Mesa> miembros) {
+    if (mesa == null) return 'Selecciona una Mesa';
+    if (mesa.ocupada) {
+      return unidas ? 'Tomar comanda (Mesas ${miembros.map((m) => m.numero).join('+')})' : 'Tomar comanda · Mesa ${mesa.numero}';
+    }
+    if (unidas) return 'Mesas Unidas (${miembros.map((m) => m.numero).join('+')})';
+    return 'Asignar Mesa ${mesa.numero}';
+  }
+
+  Widget _buildError() {
+    return ErrorConexion(mensajeError: _error ?? '', onReintentar: () => _cargar());
+  }
+
+  /// Muestra lo que debe cada mesa y el total por cobrar. No cobra nada.
+  Widget _buildResumenCuenta(List<Mesa> miembros, double totalCuenta) {
+    final conCuenta = miembros.where((m) => m.idOrden != null).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kTexto,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded, size: 18, color: Colors.white70),
+              const SizedBox(width: 8),
+              Text('CUENTA POR COBRAR',
+                  style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.7))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (conCuenta.length > 1)
+            ...conCuenta.map((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Mesa ${m.numero}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      Text(dinero(m.totalActual),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                )),
+          if (conCuenta.length > 1) const Divider(color: Colors.white24, height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(conCuenta.length > 1 ? 'Total' : 'Mesa ${conCuenta.first.numero}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              Text(dinero(totalCuenta),
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('El pago se realiza en caja.',
+              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFichaMesa(Mesa mesa, List<Mesa> miembros, double totalCuenta) {
+    final color = _colorEstado(mesa.estado);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorde),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  miembros.length > 1 ? 'Mesas ${miembros.map((m) => m.numero).join('+')}' : 'Mesa ${mesa.numero}',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kTexto),
+                ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Opciones de la mesa',
+                icon: const Icon(Icons.more_vert, size: 20),
+                onSelected: (v) {
+                  switch (v) {
+                    case 'editar':
+                      _editarMesa(mesa);
+                      break;
+                    case 'eliminar':
+                      _eliminarMesa(mesa);
+                      break;
+                    case 'cancelar':
+                      _cancelarCuenta(mesa);
+                      break;
+                    default:
+                      _cambiarEstado(mesa, v);
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'disponible', child: Text('Marcar disponible')),
+                  const PopupMenuItem(value: 'por_limpiar', child: Text('Marcar por limpiar')),
+                  const PopupMenuItem(value: 'reservada', child: Text('Marcar reservada')),
+                  if (mesa.idOrden != null && esCajaOAdmin(widget.usuario))
+                    const PopupMenuItem(value: 'cancelar', child: Text('Cancelar cuenta')),
+                  if (_admin) const PopupMenuItem(value: 'editar', child: Text('Editar mesa')),
+                  if (_admin) const PopupMenuItem(value: 'eliminar', child: Text('Eliminar mesa')),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              EtiquetaEstado(_etiquetaEstado(mesa.estado), color),
+              const SizedBox(width: 8),
+              const Icon(Icons.groups_rounded, size: 16, color: kTextoSuave),
+              const SizedBox(width: 4),
+              Text('Capacidad: ${mesa.capacidad} pers.', style: const TextStyle(fontSize: 12, color: kTextoSuave)),
+            ],
+          ),
+          if (mesa.idOrden != null) ...[
+            const SizedBox(height: 8),
+            Text('Debe: ${dinero(mesa.totalActual)}',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: kTexto)),
+            if (mesa.comensales > 0)
+              Text('${mesa.comensales} comensales', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+            if (mesa.mesero != null)
+              Text('Atiende: ${mesa.mesero}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlano() {
+    final enArea = _mesasArea;
+    final areaNombre = _areas.where((a) => a.id == _areaId).map((a) => a.nombre).join();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                decoration: BoxDecoration(
+                  color: kTexto,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.layers_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(areaNombre.isEmpty ? 'Sin áreas' : areaNombre,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                    const SizedBox(width: 10),
+                    Text('${enArea.length} mesas',
+                        style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    for (final e in ['disponible', 'ocupada', 'reservada', 'por_limpiar'])
+                      LeyendaPill(_colorEstado(e), _etiquetaEstado(e)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: enArea.isEmpty
+              ? Center(
+                  child: Text(
+                    _admin ? 'No hay mesas en esta área. Usa "Agregar Mesa".' : 'No hay mesas en esta área.',
+                    style: const TextStyle(color: kTextoSuave),
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: enArea.map((mesa) {
+                        final bool isSelected = _mesaSeleccionadaId == mesa.id;
+                        final bool estaUnida = mesa.grupo != null && _grupoDe(mesa).length > 1;
+                        final sel = _mesaSel;
+                        final bool esGrupoSeleccionado =
+                            estaUnida && sel != null && sel.grupo == mesa.grupo;
+
+                        return Positioned(
+                          left: mesa.x,
+                          top: mesa.y,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _mesaSeleccionadaId = mesa.id),
+                            onPanStart: (_) => setState(() => _mesaSeleccionadaId = mesa.id),
+                            onPanUpdate: (d) => _moverMesaOGrupo(mesa, d.delta, constraints),
+                            onPanEnd: (_) => _soltarMesa(mesa),
+                            child: MesaWidget(
+                              numero: estaUnida ? 'M${mesa.numero}' : mesa.numero,
+                              isSelected: isSelected || esGrupoSeleccionado,
+                              estado: mesa.estado,
+                              monto: (mesa.idOrden != null && mesa.totalActual > 0)
+                                  ? dinero(mesa.totalActual)
+                                  : null,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// =====================================================================
+// Diálogo: crear / editar mesa
+// =====================================================================
+class _MesaDialog extends StatefulWidget {
+  final List<Area> areas;
+  final int? areaInicial;
+  final Mesa? mesa; // null = crear
+  final String sugerencia;
+
+  const _MesaDialog({required this.areas, this.areaInicial, this.mesa, this.sugerencia = ''});
+
+  @override
+  State<_MesaDialog> createState() => _MesaDialogState();
+}
+
+class _MesaDialogState extends State<_MesaDialog> {
+  late final TextEditingController _numero =
+      TextEditingController(text: widget.mesa?.numero ?? widget.sugerencia);
+  late final TextEditingController _capacidad =
+      TextEditingController(text: '${widget.mesa?.capacidad ?? 4}');
+  int? _area;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _area = widget.areaInicial ?? (widget.areas.isNotEmpty ? widget.areas.first.id : null);
+  }
+
+  @override
+  void dispose() {
+    _numero.dispose();
+    _capacidad.dispose();
+    super.dispose();
+  }
+
+  void _guardar() {
+    final numero = _numero.text.trim();
+    final cap = int.tryParse(_capacidad.text.trim());
+    if (numero.isEmpty) {
+      setState(() => _error = 'Escribe el número o nombre de la mesa.');
+      return;
+    }
+    if (cap == null || cap < 1) {
+      setState(() => _error = 'La capacidad debe ser al menos 1.');
+      return;
+    }
+    Navigator.pop(context, {'numero': numero, 'capacidad': cap, 'id_area': _area});
+  }
+
+  @override
+  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
+
+  Widget _dialogo() {
+    return AlertDialog(
+      backgroundColor: kPanel,
+      shape: kFormaDialogo,
+      title: Text(widget.mesa == null ? 'Nueva mesa' : 'Editar mesa'),
+      content: SizedBox(
+        width: 320,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _numero,
+                decoration: campo('Número / nombre (ej. 4, T1, B2)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _capacidad,
+                keyboardType: TextInputType.number,
+                decoration: campo('Capacidad (personas)'),
+              ),
+              const SizedBox(height: 12),
+              Selector<int>(
+                etiqueta: 'Área',
+                valor: _area,
+                items: widget.areas.map((a) => DropdownMenuItem<int>(value: a.id, child: Text(a.nombre))).toList(),
+                onChanged: (v) => setState(() => _area = v),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(_error!, style: const TextStyle(color: kRojo, fontSize: 12)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(onPressed: _guardar, child: const Text('Guardar')),
+      ],
+    );
+  }
+}
