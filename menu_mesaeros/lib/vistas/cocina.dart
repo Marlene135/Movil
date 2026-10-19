@@ -1,4 +1,5 @@
 // vistas/cocina.dart - Pantalla KDS: comandas en vivo para cocina y barra.
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modulos/orden.dart';
@@ -22,17 +23,44 @@ class _CocinaVistaState extends State<CocinaVista> {
   bool _ocupado = false;
   String? _error;
   Timer? _timer;
+  
+  // 1. Declarar la variable del socket
+  IO.Socket? _socket;
 
   @override
   void initState() {
     super.initState();
     _cargar();
+    // Se mantiene como respaldo por si falla el internet
     _timer = Timer.periodic(const Duration(seconds: 8), (_) => _cargar(silencioso: true));
+    
+    // 2. Inicializar el WebSocket al abrir la pantalla
+    _conectarSocket();
+  }
+
+  void _conectarSocket() {
+    _socket = IO.io('http://localhost:3000', 
+        IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .build()
+    );
+
+    _socket?.onConnect((_) {
+      print('🟢 KDS (Cocina) conectado al WebSocket');
+    });
+
+    // 3. Escuchar cuando un mesero envía una orden para refrescar al instante
+    _socket?.on('renderizar_kds', (_) {
+      print('🔄 Nueva comanda recibida, actualizando pantalla...');
+      _cargar(silencioso: true);
+    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    // 4. Desconectar el socket al salir de la pantalla
+    _socket?.disconnect();
     super.dispose();
   }
 
@@ -59,6 +87,14 @@ class _CocinaVistaState extends State<CocinaVista> {
     setState(() => _ocupado = true);
     try {
       await DbService.cambiarEstadoItems(ids, estado);
+      
+      // 5. Avisar a través del socket que un platillo cambió de estado (ej. a "LISTO")
+      _socket?.emit('platillo_preparado', {
+        'ids': ids,
+        'estado': estado,
+        'estacion': _estacion ?? 'Cocina'
+      });
+
     } on ApiException catch (e) {
       if (mounted) mensaje(context, e.mensaje, error: true);
     } finally {
@@ -145,7 +181,7 @@ class _CocinaVistaState extends State<CocinaVista> {
                       children: [
                         Icon(Icons.sync_rounded, size: 16, color: kTexto),
                         SizedBox(width: 6),
-                        Text('Live 8s', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTexto)),
+                        Text('Live', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTexto)),
                       ],
                     ),
                   ),

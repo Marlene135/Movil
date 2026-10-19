@@ -19,8 +19,12 @@ class ApiService {
   //   flutter run --dart-define=API_HOST=10.0.2.2        (emulador Android)
   // Si no se define, usa el host desde el que se sirve la app (web) o 'localhost'.
   static const String _hostDefine = String.fromEnvironment('API_HOST');
-  static const String _portDefine = String.fromEnvironment('API_PORT', defaultValue: '8081');
-  static const String _pathDefine = String.fromEnvironment('API_PATH', defaultValue: '/KDS');
+  
+  // CORRECCIÓN 1: Cambiamos el puerto por defecto a 80 (estándar de XAMPP/Apache)
+  static const String _portDefine = String.fromEnvironment('API_PORT', defaultValue: '80');
+  
+  // CORRECCIÓN 2: Apuntamos a la carpeta de tu proyecto web en lugar de /KDS
+ static const String _pathDefine = String.fromEnvironment('API_PATH', defaultValue: '/KDS/Movil');
 
   /// Token de la sesión actual (lo entrega login.php).
   static String? token;
@@ -32,7 +36,11 @@ class ApiService {
     final host = _hostDefine.isNotEmpty
         ? _hostDefine
         : (Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost');
-    return 'http://$host:$_portDefine$_pathDefine';
+        
+    // Si el puerto es 80, lo omitimos para mantener la URL limpia (http://localhost/restaurante_app)
+    final puertoStr = (_portDefine == '80' || _portDefine.isEmpty) ? '' : ':$_portDefine';
+    
+    return 'http://$host$puertoStr$_pathDefine';
   }
 
   static Uri _uri(String ruta, Map<String, dynamic>? query) {
@@ -106,7 +114,4 @@ class ApiService {
     }
     return json;
   }
-
-
-  
 }
