@@ -210,42 +210,6 @@ class _MesasScreenState extends State<MesasScreen> {
     ).then((_) => _cargar(silencioso: true));
   }
 
-  Future<void> _cobrar(Mesa mesa) async {
-    final miembros = _grupoDe(mesa).where((m) => m.idOrden != null).toList();
-    final total = miembros.fold<double>(0, (s, m) => s + m.totalActual);
-    if (miembros.isEmpty || total <= 0) {
-      mensaje(context, 'La cuenta no tiene consumo. Para liberar la mesa usa el menú ⋮ → Disponible.', error: true);
-      return;
-    }
-    final etiqueta = miembros.map((m) => m.numero).join(' + ');
-    final datos = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => _PagoDialog(total: total, etiqueta: etiqueta),
-    );
-    if (datos == null) return;
-
-    setState(() => _ocupado = true);
-    try {
-      final r = await DbService.pagar(
-        idsOrden: miembros.map((m) => m.idOrden!).toList(),
-        metodoPago: datos['metodo'] as String,
-        montoRecibido: datos['recibido'] as double,
-        propina: datos['propina'] as double,
-      );
-      if (mounted) {
-        final cambio = toDouble(r['cambio']);
-        mensaje(context, cambio > 0
-            ? '¡Cuenta pagada! Cambio: ${dinero(cambio)}. Mesas liberadas.'
-            : '¡Cuenta pagada! Las mesas quedaron disponibles.');
-      }
-    } on ApiException catch (e) {
-      if (mounted) mensaje(context, e.mensaje, error: true);
-    } finally {
-      if (mounted) setState(() => _ocupado = false);
-    }
-    await _cargar(silencioso: true);
-  }
-
   Future<void> _cambiarEstado(Mesa mesa, String estado) async {
     await _run(() => DbService.actualizarMesa(mesa.id, {'estado': estado}));
   }
@@ -527,26 +491,9 @@ class _MesasScreenState extends State<MesasScreen> {
                             const SizedBox(height: 8),
                           ],
 
-                          // Cobro (mesa individual con cuenta o grupo unido)
+                          // Cuenta por mesa (solo lectura: el cobro se hace en caja, no desde el móvil)
                           if (mesa != null && hayCuenta) ...[
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kCafe,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                ),
-                                onPressed: _ocupado ? null : () => _cobrar(mesa),
-                                icon: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 20),
-                                label: Text(
-                                  tieneGrupoUnido
-                                      ? 'Pagar Cuenta y Separar (${dinero(totalCuenta)})'
-                                      : 'Cobrar Cuenta (${dinero(totalCuenta)})',
-                                  style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
+                            _buildResumenCuenta(miembros, totalCuenta),
                             const SizedBox(height: 10),
                           ],
 
@@ -600,6 +547,63 @@ class _MesasScreenState extends State<MesasScreen> {
 
   Widget _buildError() {
     return ErrorConexion(mensajeError: _error ?? '', onReintentar: () => _cargar());
+  }
+
+  /// Muestra lo que debe cada mesa y el total por cobrar. No cobra nada.
+  Widget _buildResumenCuenta(List<Mesa> miembros, double totalCuenta) {
+    final conCuenta = miembros.where((m) => m.idOrden != null).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: kTexto,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded, size: 18, color: Colors.white70),
+              const SizedBox(width: 8),
+              Text('CUENTA POR COBRAR',
+                  style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.7))),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (conCuenta.length > 1)
+            ...conCuenta.map((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Mesa ${m.numero}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      Text(dinero(m.totalActual),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                )),
+          if (conCuenta.length > 1) const Divider(color: Colors.white24, height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(conCuenta.length > 1 ? 'Total' : 'Mesa ${conCuenta.first.numero}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              Text(dinero(totalCuenta),
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('El pago se realiza en caja.',
+              style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.6))),
+        ],
+      ),
+    );
   }
 
   Widget _buildFichaMesa(Mesa mesa, List<Mesa> miembros, double totalCuenta) {
@@ -667,7 +671,8 @@ class _MesasScreenState extends State<MesasScreen> {
           ),
           if (mesa.idOrden != null) ...[
             const SizedBox(height: 8),
-            Text('Cuenta: ${dinero(totalCuenta)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('Debe: ${dinero(mesa.totalActual)}',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: kTexto)),
             if (mesa.comensales > 0)
               Text('${mesa.comensales} comensales', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
             if (mesa.mesero != null)
@@ -751,6 +756,9 @@ class _MesasScreenState extends State<MesasScreen> {
                               numero: estaUnida ? 'M${mesa.numero}' : mesa.numero,
                               isSelected: isSelected || esGrupoSeleccionado,
                               estado: mesa.estado,
+                              monto: (mesa.idOrden != null && mesa.totalActual > 0)
+                                  ? dinero(mesa.totalActual)
+                                  : null,
                             ),
                           ),
                         );
@@ -856,127 +864,6 @@ class _MesaDialogState extends State<_MesaDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         TextButton(onPressed: _guardar, child: const Text('Guardar')),
-      ],
-    );
-  }
-}
-
-// =====================================================================
-// Diálogo: cobro de cuenta
-// =====================================================================
-class _PagoDialog extends StatefulWidget {
-  final double total;
-  final String etiqueta;
-
-  const _PagoDialog({required this.total, required this.etiqueta});
-
-  @override
-  State<_PagoDialog> createState() => _PagoDialogState();
-}
-
-class _PagoDialogState extends State<_PagoDialog> {
-  static const Map<String, String> _metodos = {
-    'EFECTIVO': 'Efectivo',
-    'TARJETA_CREDITO': 'Tarjeta de crédito',
-    'TARJETA_DEBITO': 'Tarjeta de débito',
-    'TRANSFERENCIA': 'Transferencia',
-  };
-
-  String _metodo = 'EFECTIVO';
-  late final TextEditingController _recibido =
-      TextEditingController(text: widget.total.toStringAsFixed(2));
-  final TextEditingController _propina = TextEditingController(text: '0');
-  String? _error;
-
-  @override
-  void dispose() {
-    _recibido.dispose();
-    _propina.dispose();
-    super.dispose();
-  }
-
-  double get _recibidoNum => leerNumero(_recibido.text) ?? 0;
-  double get _cambio => math.max(0, _recibidoNum - widget.total);
-
-  void _cobrar() {
-    final propina = leerNumero(_propina.text) ?? 0;
-    final recibido = _metodo == 'EFECTIVO' ? _recibidoNum : widget.total;
-    if (propina < 0) {
-      setState(() => _error = 'La propina no puede ser negativa.');
-      return;
-    }
-    if (recibido + 0.001 < widget.total) {
-      setState(() => _error = 'El monto recibido es menor al total.');
-      return;
-    }
-    Navigator.pop(context, {'metodo': _metodo, 'recibido': recibido, 'propina': propina});
-  }
-
-  @override
-  Widget build(BuildContext context) => TemaSazon(child: _dialogo());
-
-  Widget _dialogo() {
-    return AlertDialog(
-      backgroundColor: kPanel,
-      shape: kFormaDialogo,
-      title: Text('Cobrar Mesa ${widget.etiqueta}'),
-      content: SizedBox(
-        width: 340,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total a pagar', style: TextStyle(fontSize: 14)),
-                  Text(dinero(widget.total),
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kVerde)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Selector<String>(
-                etiqueta: 'Método de pago',
-                valor: _metodo,
-                items: _metodos.entries
-                    .map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value)))
-                    .toList(),
-                onChanged: (v) => setState(() => _metodo = v ?? 'EFECTIVO'),
-              ),
-              if (_metodo == 'EFECTIVO') ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _recibido,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: campo('Efectivo recibido', prefixText: '\$ '),
-                  onChanged: (_) => setState(() => _error = null),
-                ),
-                const SizedBox(height: 8),
-                Text('Cambio: ${dinero(_cambio)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-              ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _propina,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: campo('Propina (opcional)', prefixText: '\$ '),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(_error!, style: const TextStyle(color: kRojo, fontSize: 12)),
-              ],
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: kVerde, foregroundColor: Colors.white),
-          onPressed: _cobrar,
-          child: const Text('Cobrar'),
-        ),
       ],
     );
   }

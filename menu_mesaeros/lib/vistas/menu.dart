@@ -498,8 +498,6 @@ class _MenuVistaState extends State<MenuVista> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(prod.emoji, style: const TextStyle(fontSize: 22)),
-                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(prod.nombre,
                         maxLines: 2,
@@ -695,8 +693,6 @@ class _MenuVistaState extends State<MenuVista> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(b.producto.emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -20,7 +20,6 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
   final int _maxPinLength = 4;
   bool _obscurePin = true;
   bool _isLoading = false;
-  int _selectedTab = 0; // 0: PIN, 1: Acceso, 2: Registro
 
   void _onNumberPress(String digit) {
     if (_pin.length < _maxPinLength) {
@@ -172,8 +171,6 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildTabs(),
-                  const SizedBox(height: 16),
                   _buildPinDisplay(),
                   const SizedBox(height: 20),
                   _buildKeypad(),
@@ -213,60 +210,6 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabs() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFECE7DF),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          _tabItem(0, 'PIN', null),
-          _tabItem(1, 'Acceso', Icons.person_outline_rounded),
-          _tabItem(2, 'Registro', Icons.person_add_alt_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _tabItem(int index, String label, IconData? icon) {
-    final bool isSelected = _selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF26201B) : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 15,
-                  color: isSelected ? Colors.white : const Color(0xFF6B645C),
-                ),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : const Color(0xFF6B645C),
-                ),
-              ),
-            ],
           ),
         ),
       ),

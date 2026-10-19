@@ -7,12 +7,15 @@ class MesaWidget extends StatefulWidget {
   final bool isSelected;
   // Estado en la base de datos: disponible | ocupada | por_limpiar | reservada
   final String estado;
+  // Texto opcional con lo que debe la mesa (ej. "$450.00"); null = no se muestra.
+  final String? monto;
 
   const MesaWidget({
     super.key,
     required this.numero,
     required this.isSelected,
     this.estado = 'disponible',
+    this.monto,
   });
 
   @override
@@ -104,14 +107,35 @@ class _MesaWidgetState extends State<MesaWidget> {
                 Container(height: 6, color: acento),
                 Expanded(
                   child: Center(
-                    child: Text(
-                      widget.numero,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: kTexto,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.numero,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: kTexto,
+                            ),
+                          ),
+                          if (widget.monto != null)
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                widget.monto!,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 10,
+                                  color: kEstadoOcupada,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
