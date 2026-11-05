@@ -15,6 +15,7 @@ class ApiException implements Exception {
 }
 
 class ApiService {
+<<<<<<< HEAD
   // Valores por defecto (se pueden fijar al compilar con --dart-define).
   // Desde la app se cambian en "Configuración" y se guardan en el dispositivo.
   static const String _hostDefine = String.fromEnvironment('API_HOST', defaultValue: 'sazont.tech');
@@ -77,6 +78,17 @@ class ApiService {
     ruta = _pathDefine;
     https = false;
   }
+=======
+  // Se puede fijar al compilar
+ // Cambia la IP local por tu dominio en Hostinger
+static const String _hostDefine = String.fromEnvironment('API_HOST', defaultValue: 'sazont.tech');
+
+// Como usaremos HTTPS/HTTP estándar en el servidor web, asegúrate de dejar el puerto vacío o en blanco
+static const String _portDefine = String.fromEnvironment('API_PORT', defaultValue: ''); 
+
+// Ajusta la ruta de la carpeta donde subiste tu API en el servidor (por ejemplo, '/api')
+static const String _pathDefine = String.fromEnvironment('API_PATH', defaultValue: '/api');
+>>>>>>> 59cc9c6 (modificacion en config.php y api_service.dart)
 
   /// Token de la sesión actual (lo entrega login.php).
   static String? token;
@@ -89,9 +101,20 @@ class ApiService {
       host.isNotEmpty ? host : (Uri.base.host.isNotEmpty ? Uri.base.host : '10.0.10.16');
 
   static String get baseUrl {
+<<<<<<< HEAD
     final esquema = https ? 'https' : 'http';
     final pto = puerto.isEmpty ? '' : ':$puerto';
     return '$esquema://$hostEfectivo$pto$ruta';
+=======
+    final host = _hostDefine.isNotEmpty 
+        ? _hostDefine 
+        : (Uri.base.host.isNotEmpty ? Uri.base.host : '10.0.10.16');
+        
+    if (_portDefine.isEmpty) {
+      return 'http://$host$_pathDefine';
+    }
+    return 'http://$host:$_portDefine$_pathDefine';
+>>>>>>> 59cc9c6 (modificacion en config.php y api_service.dart)
   }
 
   static Uri _uri(String ruta, Map<String, dynamic>? query) {
