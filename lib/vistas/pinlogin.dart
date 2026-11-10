@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../widgets/keypadbutton.dart';
 import '../widgets/ui.dart' show kFondo, kCafe;
 import '../servicios/db_service.dart';
+import 'configuracion.dart';
 import 'dashboard.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -117,7 +118,8 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
     return Scaffold(
       backgroundColor: kFondo,
       body: SafeArea(
-        child: Center(
+        child: Stack(children: [
+        Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Container(
@@ -212,6 +214,20 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
             ),
           ),
         ),
+        // Acceso a la configuración del servidor (antes de iniciar sesión)
+        Positioned(
+          top: 4,
+          right: 4,
+          child: IconButton(
+            tooltip: 'Configuración del servidor',
+            icon: const Icon(Icons.settings_rounded, color: Color(0xFF8C847B)),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ConfiguracionVista()),
+            ),
+          ),
+        ),
+        ]),
       ),
     );
   }

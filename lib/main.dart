@@ -6,7 +6,9 @@ import 'vistas/pinlogin.dart';
 /// Permite navegar desde fuera de un widget (p. ej. al expirar la sesión).
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ApiService.cargarConfig();
   // Si el servidor responde 401 con una sesión activa, regresa al login.
   ApiService.onSesionExpirada = () {
     final nav = navigatorKey.currentState;
@@ -58,3 +60,4 @@ class SazonTrackApp extends StatelessWidget {
     );
   }
 }
+

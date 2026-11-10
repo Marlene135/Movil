@@ -1,5 +1,4 @@
-// Acceso a datos de la app. Todo pasa por los endpoints PHP de /KDS/api,
-// que son los que hablan con PostgreSQL (sazontrack_db2).
+
 import 'api_service.dart';
 import '../modulos/orden.dart';
 import '../modulos/producto.dart';
@@ -11,7 +10,7 @@ List<Map<String, dynamic>> _lista(dynamic data) =>
 Map<String, dynamic> _mapa(dynamic data) => Map<String, dynamic>.from(data as Map);
 
 class DbService {
-  // ------------------------------------------------------------------ Sesión
+  // Sesión
   /// Valida el PIN. Devuelve el usuario (y guarda el token) o null si el PIN es incorrecto.
   static Future<Map<String, dynamic>?> validarPin(String pin) async {
     try {

@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiException implements Exception {
   final String mensaje;
@@ -14,13 +15,68 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  // Se puede fijar al compilar:
-  //   flutter run --dart-define=API_HOST=192.168.1.50
-  //   flutter run --dart-define=API_HOST=10.0.2.2        (emulador Android)
-  // Si no se define, usa el host desde el que se sirve la app (web) o 'localhost'.
-  static const String _hostDefine = String.fromEnvironment('API_HOST');
-  static const String _portDefine = String.fromEnvironment('API_PORT', defaultValue: '8081');
-  static const String _pathDefine = String.fromEnvironment('API_PATH', defaultValue: '/KDS');
+  // Valores por defecto (se pueden fijar al compilar con --dart-define).
+  // Desde la app se cambian en "Configuración" y se guardan en el dispositivo.
+  static const String _hostDefine = String.fromEnvironment('API_HOST', defaultValue: 'sazont.tech');
+  static const String _portDefine = String.fromEnvironment('API_PORT', defaultValue: '');
+  static const String _pathDefine = String.fromEnvironment('API_PATH', defaultValue: '/api');
+
+  static const String _kHost = 'cfg_host';
+  static const String _kPuerto = 'cfg_puerto';
+  static const String _kRuta = 'cfg_ruta';
+  static const String _kHttps = 'cfg_https';
+
+  /// Configuración actual del servidor (editable desde la app).
+  static String host = _hostDefine;
+  static String puerto = _portDefine;
+  static String ruta = _pathDefine;
+  static bool https = false;
+
+  /// Carga la configuración guardada. Llamar una vez antes de runApp().
+  static Future<void> cargarConfig() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      host = p.getString(_kHost) ?? _hostDefine;
+      puerto = p.getString(_kPuerto) ?? _portDefine;
+      ruta = p.getString(_kRuta) ?? _pathDefine;
+      https = p.getBool(_kHttps) ?? false;
+    } catch (_) {
+      // Si no se puede leer, se usan los valores por defecto.
+    }
+  }
+
+  /// Guarda la configuración del servidor en el dispositivo.
+  static Future<void> guardarConfig({
+    required String host,
+    required String puerto,
+    required String ruta,
+    required bool https,
+  }) async {
+    ApiService.host = host.trim();
+    ApiService.puerto = puerto.trim();
+    var r = ruta.trim();
+    if (r.isNotEmpty && !r.startsWith('/')) r = '/$r';
+    if (r.endsWith('/')) r = r.substring(0, r.length - 1);
+    ApiService.ruta = r;
+    ApiService.https = https;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kHost, ApiService.host);
+    await p.setString(_kPuerto, ApiService.puerto);
+    await p.setString(_kRuta, ApiService.ruta);
+    await p.setBool(_kHttps, https);
+  }
+
+  /// Vuelve a los valores por defecto.
+  static Future<void> restablecerConfig() async {
+    final p = await SharedPreferences.getInstance();
+    for (final k in [_kHost, _kPuerto, _kRuta, _kHttps]) {
+      await p.remove(k);
+    }
+    host = _hostDefine;
+    puerto = _portDefine;
+    ruta = _pathDefine;
+    https = false;
+  }
 
   /// Token de la sesión actual (lo entrega login.php).
   static String? token;
@@ -28,11 +84,14 @@ class ApiService {
   /// Se llama cuando el servidor responde 401 con una sesión activa.
   static void Function()? onSesionExpirada;
 
+  /// Host efectivo (si está vacío, usa el de la página web o un valor de respaldo).
+  static String get hostEfectivo =>
+      host.isNotEmpty ? host : (Uri.base.host.isNotEmpty ? Uri.base.host : '10.0.10.16');
+
   static String get baseUrl {
-    final host = _hostDefine.isNotEmpty
-        ? _hostDefine
-        : (Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost');
-    return 'http://$host:$_portDefine$_pathDefine';
+    final esquema = https ? 'https' : 'http';
+    final pto = puerto.isEmpty ? '' : ':$puerto';
+    return '$esquema://$hostEfectivo$pto$ruta';
   }
 
   static Uri _uri(String ruta, Map<String, dynamic>? query) {
@@ -106,7 +165,5 @@ class ApiService {
     }
     return json;
   }
-
-
-  
 }
+

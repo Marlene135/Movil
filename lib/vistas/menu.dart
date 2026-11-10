@@ -6,6 +6,7 @@ import '../modulos/producto.dart';
 import '../modulos/usuario.dart';
 import '../servicios/api_service.dart';
 import '../servicios/db_service.dart';
+import '../widgets/modificadores_dialog.dart';
 import '../widgets/ui.dart';
 
 /// Producto agregado a la comanda pero todavía no enviado.
@@ -13,6 +14,7 @@ class _Borrador {
   final Producto producto;
   int cantidad;
   String notas;
+  ModificadoresSeleccion mods = const ModificadoresSeleccion();
   _Borrador(this.producto) : notas = '', cantidad = 1;
 }
 
@@ -136,8 +138,18 @@ class _MenuVistaState extends State<MenuVista> {
   }
 
   Future<void> _notaBorrador(_Borrador b) async {
-    final t = await pedirTexto(context, 'Nota para ${b.producto.nombre}', inicial: b.notas, etiqueta: 'Ej. sin cebolla');
-    if (t != null) setState(() => b.notas = t);
+    final r = await pedirModificadores(
+      context,
+      producto: b.producto.nombre,
+      precio: b.producto.precio,
+      inicial: b.mods,
+    );
+    if (r != null) {
+      setState(() {
+        b.mods = r;
+        b.notas = r.texto;
+      });
+    }
   }
 
   double get _totalBorrador => _borrador.fold(0.0, (s, b) => s + b.producto.precio * b.cantidad);
@@ -699,12 +711,26 @@ class _MenuVistaState extends State<MenuVista> {
               children: [
                 Text(b.producto.nombre,
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTexto)),
-                InkWell(
-                  onTap: () => _notaBorrador(b),
-                  child: Text(b.notas.isEmpty ? '+ nota' : b.notas,
-                      style: TextStyle(fontSize: 11, color: b.notas.isEmpty ? kVerde : kTextoSuave)),
-                ),
+                if (b.notas.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(b.notas, style: const TextStyle(fontSize: 11, color: kTextoSuave)),
+                  ),
                 const SizedBox(height: 4),
+                OutlinedButton.icon(
+                  onPressed: () => _notaBorrador(b),
+                  icon: Icon(b.notas.isEmpty ? Icons.add : Icons.edit_outlined, size: 14),
+                  label: Text(b.notas.isEmpty ? 'Nota' : 'Editar nota'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kVerde,
+                    side: const BorderSide(color: kVerde),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+                const SizedBox(height: 6),
                 Row(children: [
                   InkWell(
                     onTap: () => setState(() {
