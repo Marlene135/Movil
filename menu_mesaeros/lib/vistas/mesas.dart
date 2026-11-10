@@ -1,5 +1,4 @@
-// vistas/mesas.dart - Plano de mesas conectado a la base de datos:
-// asignación, fusión/movimiento en conjunto (se guarda), cobro y administración.
+// mesas - Plano de mesas conectado a la base de datos:
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../modulos/conv.dart';

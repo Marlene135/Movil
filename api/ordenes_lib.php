@@ -119,3 +119,5 @@ function liberar_mesa($pdo, $idMesa, $estadoNuevo)
     $pdo->prepare("UPDATE public.mesas SET estado = :e, grupo_union = NULL WHERE id_mesa = :m")
         ->execute(array(':e' => $estadoNuevo, ':m' => $idMesa));
 }
+
+

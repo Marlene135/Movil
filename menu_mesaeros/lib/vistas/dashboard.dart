@@ -1,4 +1,4 @@
-// vistas/dashboard.dart - Resumen en vivo (datos reales de la base de datos)
+// dashboard - Resumen en vivo (datos reales de la base de datos)
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modulos/conv.dart';

@@ -1,4 +1,4 @@
-/// vistas/reservaciones.dart - Calendario y detalle de reservas (datos reales)
+/// reservaciones - Calendario y detalle de reservas (datos reales)
 import 'package:flutter/material.dart';
 import '../modulos/orden.dart';
 import '../modulos/reserva.dart';

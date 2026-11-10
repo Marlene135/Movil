@@ -16,7 +16,7 @@ class CocinaVista extends StatefulWidget {
 }
 
 class _CocinaVistaState extends State<CocinaVista> {
-  String? _estacion; // null = todas
+  String? _estacion;
   List<KdsItem> _items = [];
   bool _cargando = true;
   bool _ocupado = false;

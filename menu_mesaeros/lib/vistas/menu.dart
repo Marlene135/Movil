@@ -1,4 +1,4 @@
-// vistas/menu.dart - POS: catálogo real, comanda por mesa y envío a cocina/barra.
+// menu - POS: catálogo real, comanda por mesa y envío a cocina/barra.
 import 'package:flutter/material.dart';
 import '../modulos/conv.dart';
 import '../modulos/orden.dart';

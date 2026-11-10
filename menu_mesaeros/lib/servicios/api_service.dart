@@ -1,5 +1,4 @@
-// Cliente HTTP genérico: agrega el token de sesión, decodifica el JSON y
-// convierte los errores del servidor en ApiException con mensajes legibles.
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -14,10 +13,7 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  // Se puede fijar al compilar:
-  //   flutter run --dart-define=API_HOST=192.168.1.50
-  //   flutter run --dart-define=API_HOST=10.0.2.2        (emulador Android)
-  // Si no se define, usa el host desde el que se sirve la app (web) o 'localhost'.
+
   static const String _hostDefine = String.fromEnvironment('API_HOST');
   static const String _portDefine = String.fromEnvironment('API_PORT', defaultValue: '8081');
   static const String _pathDefine = String.fromEnvironment('API_PATH', defaultValue: '/KDS');

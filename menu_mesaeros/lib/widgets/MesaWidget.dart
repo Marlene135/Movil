@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'ui.dart';
 
-// Widget principal que dibuja la mesa cuadrada/redondeada junto con sus sillas
 class MesaWidget extends StatefulWidget {
   final String numero;
   final bool isSelected;
-  // Estado en la base de datos: disponible | ocupada | por_limpiar | reservada
   final String estado;
-  // Texto opcional con lo que debe la mesa (ej. "$450.00"); null = no se muestra.
   final String? monto;
 
   const MesaWidget({
