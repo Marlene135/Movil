@@ -1,4 +1,4 @@
-// dashboard - Resumen en vivo (datos reales de la base de datos)
+// vistas/dashboard.dart - Resumen en vivo (datos reales de la base de datos)
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modulos/conv.dart';
@@ -7,6 +7,7 @@ import '../servicios/api_service.dart';
 import '../servicios/db_service.dart';
 import '../widgets/ui.dart';
 import 'cocina.dart';
+import 'configuracion.dart';
 import 'menu.dart';
 import 'mesas.dart';
 import 'reservaciones.dart';
@@ -148,6 +149,10 @@ class _DashboardVistaState extends State<DashboardVista> {
                       _itemMenu(Icons.soup_kitchen_rounded, 'KDS Cocina / Barra', onTap: () {
                         Navigator.pop(context);
                         _ir(CocinaVista(usuario: widget.usuario));
+                      }),
+                      _itemMenu(Icons.settings_rounded, 'Configuración', onTap: () {
+                        Navigator.pop(context);
+                        _ir(const ConfiguracionVista());
                       }),
                     ],
                   ),
